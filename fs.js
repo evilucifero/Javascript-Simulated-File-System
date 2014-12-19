@@ -1,15 +1,16 @@
 // 全局变量，显示当前用户名 string name
 var userNow = "root";
 
-//全局变量，显示当前路径 string-array dirname
+// 全局变量，显示当前路径 string-array dirname
 var locNow = ["/"];
 
-//全局变量，显示当前目录的FCB号 number fcbnum
+// 全局变量，显示当前目录的FCB号 number fcbnum
 var dirfcbNow = 0;
 
-//文件控制块  object-array fileinfo
+// 文件控制块  object-array fileinfo
 /*
- * FCB文件控制块格式范例
+ *  FCB文件控制块格式范例
+ *
  *	var file = {
  *		name:"",
  *		meta:{
@@ -21,44 +22,45 @@ var dirfcbNow = 0;
  *		},
  *		iaddr:[] //number-array disknum
  *	};
+ *
  */
 var fcb = [
 	{
-	name:"/",
-	meta:{
-		type:"d",
-		own:"root",
-		mod:[true,true,true,true,true,false,true,true,false],
-		createAt:"",
-		updateAt:""
-	},
-	iaddr:[1,2]
-	},
-	{
-	name:"file1",
-	meta:{
-		type:"-",
-		own:"root",
-		mod:[true,true,true,true,true,false,true,true,false],
-		createAt:"Fri Dec 19 2014 00:41:35 GMT+0800",
-		updateAt:"Fri Dec 19 2014 00:41:35 GMT+0800"
-	},
-	iaddr:[3]
+		name:"/",
+		meta:{
+			type:"d",
+			own:"root",
+			mod:[true,true,true,true,true,false,true,true,false],
+			createAt:"",
+			updateAt:""
+		},
+		iaddr:[1,2]
 	},
 	{
-	name:"file2",
-	meta:{
-		type:"-",
-		own:"root",
-		mod:[true,true,true,true,true,false,true,true,false],
-		createAt:"Fri Dec 19 2014 00:41:35 GMT+0800",
-		updateAt:"Fri Dec 19 2014 00:41:35 GMT+0800"
+		name:"file1",
+		meta:{
+			type:"-",
+			own:"root",
+			mod:[true,true,true,true,true,false,true,true,false],
+			createAt:1418995724279,
+			updateAt:1418995724279
+		},
+		iaddr:[3]
 	},
-	iaddr:[4]
+	{
+		name:"file2",
+		meta:{
+			type:"-",
+			own:"root",
+			mod:[true,true,true,true,true,false,true,true,false],
+			createAt:1418995724279,
+			updateAt:1418995724279
+		},
+		iaddr:[4]
 	}
 ];
 
-//磁盘信息 string-array file
+// 磁盘信息 string-array file
 var disk = [
 	"fcb[0]",
 	"fcb[1]",
@@ -73,13 +75,13 @@ var dirFileNameCache = [];
 var dirFcbnumCache = [];
 
 // 转换文件名到其对应i节点上的fcb号 Convert filename to fcbnum
-var find = function (filename){
-	for(var i = 0; i < dirFileNameCache.length; i++){
-		if(dirFileNameCache[i] === filename){
+var find = function (filename) {
+	for (var i = 0; i < dirFileNameCache.length; i++) {
+		if (dirFileNameCache[i] === filename) {
 			return dirFcbnumCache[i];	
 		}
 	}
-	if (filename === "."){
+	if (filename === ".") {
 		return dirfcbNow;
 	}
 	console.log("No such file.");
@@ -90,27 +92,31 @@ var find = function (filename){
 // refresh now dir Cache 
 // 当对目录/文件进行增删或打开新目录时
 // after opening a new folder delete/create a new file/dir
-var refreshDirCache = function (dirfcb){
-	for(var i = 0; i < fcb[dirfcb].iaddr.length; i++){
-		if (fcb[dirfcb].iaddr !== undefined){
-			dirFcbnumCache[i] = parseInt(disk[fcb[dirfcb].iaddr[i]].replace("fcb[","").replace("]",""));
-			dirFileNameCache[i] = fcb[dirFcbnumCache[i]].name;
+var refreshDirCache = function (dirfcb) {
+	var count = 0;
+	dirFcbnumCache = [];
+	dirFileNameCache = [];
+	for (var i = 0; i < fcb[dirfcb].iaddr.length; i++) {
+		if (fcb[dirfcb].iaddr !== undefined) {
+			dirFcbnumCache[count] = parseInt(disk[fcb[dirfcb].iaddr[i]].replace("fcb[","").replace("]",""));
+			dirFileNameCache[count] = fcb[dirFcbnumCache[count]].name;
+			count++;
 		}
 	}
 };
 
 // 显示当前用户 show user now
-var whoami = function (){
+var whoami = function () {
 	return userNow;
 };
 
 // 显示当前目录 show dir now
-var pwd = function (){
+var pwd = function () {
 	return locNow.join("");
 };
 
 // 转换用户 switch user
-var su = function (username){
+var su = function (username) {
 	userNow = username;
 	return whoami();
 };
@@ -121,7 +127,7 @@ var shmod = function (fcbnumTmp) {
 	var modArray = fcb[fcbnumTmp].meta.mod;
 	var modReturn = "";
 	for (var i = 0; i < 9; i++) {
-		if(modArray[i] === true) {
+		if (modArray[i] === true) {
 			modReturn += modString[i];
 		}
 		else {
@@ -136,11 +142,11 @@ var chmod = function (mod,filename) {
 	var fcbnumTmp = find(filename);
 	var modTmp = mod.toString().split("");
 	var modArray = [];
-	for (var i = 0; i < modTmp.length; i++){
+	for (var i = 0; i < modTmp.length; i++) {
 		modArray = modArray.concat(parseInt(modTmp[i]).toString(2).split(""));
 	}
 	for (var j = 0; j < modArray.length; j++) {
-		if (modArray[j] === "1"){
+		if (modArray[j] === "1") {
 			modArray[j] = true;
 		}
 		else {
@@ -148,6 +154,7 @@ var chmod = function (mod,filename) {
 		}
 	};
 	fcb[fcbnumTmp].meta.mod = modArray;
+	return true;
 }
 
 // 更改文件所有者 change the file owner
@@ -155,6 +162,7 @@ var chown = function (user,filename) {
 	var fcbnumTmp = find(filename);
 	var ownArray = user;
 	fcb[fcbnumTmp].meta.own = ownArray;
+	return true;
 };
 
 // 检查读写执行动作权限 check is an act can be done or not
@@ -186,14 +194,19 @@ var checkAct = function (act,filename) {
 };
 
 // 检查同目录下是否有重名 check if there is a duplicate name
-var checkDuplicateName = function (filename){
+var checkDuplicateName = function (filename) {
+	for (var i = 0; i < dirFileNameCache.length; i++) {
+		if (dirFileNameCache[i] === filename) {
+			return true;
+		};
+	};
 	return false;
 };
 
 // 获得一个新的文件控制块 request a new FCB
-var getNewFcbNum = function (){
+var getNewFcbNum = function () {
 	for (var i = 0; i < fcb.length; i++) {
-		if(fcb[i] === undefined){
+		if (fcb[i] === undefined) {
 			return i;
 		}
 	};
@@ -201,17 +214,23 @@ var getNewFcbNum = function (){
 };
 
 // 获得一个新的盘块 request a new disk block
-var getNewDiskNum = function (){
+var getNewDiskNum = function () {
 	for (var i = 0; i < disk.length; i++) {
-		if(disk[i] === undefined){
+		if (disk[i] === undefined) {
 			return i;
 		}
 	};
 	return disk.length;
 };
 
-/* 格式化磁盘 FORMAT DISK*/
-var format = function (){
+// 通过时间戳翻回时间字符串 convert UNIX-timestamp to time-string
+var shtime = function (unixtime) {
+	var d = new Date(unixtime);
+	return ""+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"/"+d.getHours()+":"+d.getMinutes()+":"+d.getSeconds();
+}
+
+/* 格式化磁盘 FORMAT DISK */
+var format = function () {
 	refreshDirCache(0);
 	console.log(whoami());
 	console.log(pwd());
@@ -220,12 +239,12 @@ var format = function (){
 
 /* 文件操作 FILE ACTION */
 // 创建新文件 create file
-var touch = function (filename){
-	if (checkDuplicateName(filename) === true){
+var touch = function (filename) {
+	if (checkDuplicateName(filename) === true) {
 		console.log("Already have a same filename, please change a new filename!")
 		return false;
 	}
-	if (checkAct("w",".") === false){
+	if (checkAct("w",".") === false) {
 		console.log("You can not create file here.")
 		return false;
 	}
@@ -238,12 +257,13 @@ var touch = function (filename){
 			createAt:"",
 			updateAt:""
 		},
-		iaddr:[] //number-array fatnum
+		iaddr:[]
 	};
 	fileTmp.name = filename;
 	fileTmp.meta.own = userNow;
-	fileTmp.meta.createAt = Date().toString();
-	fileTmp.meta.updateAt = Date().toString();
+	var d = new Date();
+	fileTmp.meta.createAt = d.getTime();
+	fileTmp.meta.updateAt = d.getTime();
 	// 分配新的DISK空间 allocate a new disk space
 	var disknumTmp = getNewDiskNum();
 	// 分配新的FCB块 allocate a fcb
@@ -259,8 +279,8 @@ var touch = function (filename){
 };
 
 // 显示文件内容 read file
-var cat = function(filename){
-	if (checkAct("r",filename) === false){
+var cat = function (filename) {
+	if (checkAct("r",filename) === false) {
 		return false;
 	}
 	var fcbnumTmp = find(filename);
@@ -273,20 +293,22 @@ var cat = function(filename){
 };
 
 // 向文件内部写入文本 write file
-var wt = function(filename,text){
-	if (checkAct("w",filename) === false){
+var wt = function (filename,text) {
+	if (checkAct("w",filename) === false) {
 		return false;
 	}
 	var fcbnumTmp = find(filename);
 	var disknumTmp = getNewDiskNum();
 	disk[disknumTmp] = text;
+	var d = new Date();
+	fcb[fcbnumTmp].meta.updateAt = d.getTime();
 	fcb[fcbnumTmp].iaddr.push(disknumTmp);
 	return true;
 };
 
 // 执行文件 execute file
-var run = function(filename){
-	if (checkAct("x",filename) === false){
+var run = function (filename) {
+	if (checkAct("x",filename) === false) {
 		return false;
 	}
 	var fcbnumTmp = find(filename);
@@ -296,10 +318,9 @@ var run = function(filename){
 	};
 	return true;
 };
-
 // 删除文件 delete file
-var rm = function(filename){
-	if (checkAct("w",filename) === false){
+var rm = function (filename) {
+	if (checkAct("w",filename) === false) {
 		return false;
 	}
 	var fcbnumTmp = find(filename);
@@ -310,49 +331,48 @@ var rm = function(filename){
 	};
 	// 从目录中删除该文件节点 delete the file index under directory fcb
 	for (var i = 0; i < fcb[dirfcbNow].iaddr.length; i++) {
-		if (parseInt(disk[fcb[dirfcbNow].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp){
+		if (parseInt(disk[fcb[dirfcbNow].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
 			disk[fcb[dirfcbNow].iaddr[i]] = undefined;
-			fcb[dirfcbNow].iaddr[i] = undefined;
+			fcb[dirfcbNow].iaddr.splice(i,1);
 			break;
 		}
 	};
-	fcb[dirfcbNow].iaddr.sort();
-	fcb[dirfcbNow].iaddr.pop();
 	// 释放文件FCB free file fcb
 	fcb[fcbnumTmp] = undefined;
 	refreshDirCache(dirfcbNow);
+	return true;
 };
 
 /* 目录操作 DIRECTORY ACTION */
 // 创建新的文件夹 create directory
-var mkdir = function(){
+var mkdir = function () {
 
 };
 
 // 更改当前目录 change directory
-var cd = function(){
+var cd = function () {
 
 };
 
 // 删除目录 delete directory
-var rmdir = function(){
+var rmdir = function () {
 
 };
 
 // 显示文件信息 file name info
-var ls = function(){
+var ls = function () {
 	var lsStr = "\n";
-	for (var i = 0; i < dirFileNameCache.length; i++){
+	for (var i = 0; i < dirFileNameCache.length; i++) {
 		lsStr += dirFileNameCache[i];
-		lsStr += "    ";
+		lsStr += "  ";
 	}
 	return lsStr;
 };
 
 // 显示文件详细信息 file details info
-var ll = function(){
+var ll = function () {
 	var llStr = "\n";
-	for (var i = 0; i < dirFileNameCache.length; i++){
+	for (var i = 0; i < dirFileNameCache.length; i++) {
 		var fcbnumTmp = dirFcbnumCache[i];
 		var fcbTmp = fcb[fcbnumTmp];
 		llStr += fcbTmp.meta.type;
@@ -361,8 +381,10 @@ var ll = function(){
 		llStr += fcbTmp.meta.own;
 		llStr += "  ";
 		llStr += fcbTmp.name;
-		llStr += "  ";
-		llStr += fcbTmp.meta.updateAt;
+		llStr += "  C";
+		llStr += shtime(fcbTmp.meta.createAt);
+		llStr += "  U";
+		llStr += shtime(fcbTmp.meta.updateAt);
 		llStr += "\n";
 	}
 	return llStr;
