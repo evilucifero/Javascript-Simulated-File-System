@@ -1,6 +1,27 @@
-var userNow = "root"; // string name
-var locNow = ["/"]; // string-array dir name
+// 全局变量，显示当前用户名 string name
+var userNow = "root";
+
+//全局变量，显示当前路径 string-array dirname
+var locNow = ["/"];
+
+//全局变量，显示当前目录的FCB号 number fcbnum
 var dirfcbNow = 0;
+
+//文件控制块  object-array fileinfo
+/*
+ * FCB文件控制块格式范例
+ *	var file = {
+ *		name:"",
+ *		meta:{
+ *			type:"",
+ *			own:"",
+ *			mod:[true,true,true,true,true,false,true,true,false],
+ *			createAt:"",
+ *			updateAt:""
+ *		},
+ *		iaddr:[] //number-array disknum
+ *	};
+ */
 var fcb = [
 	{
 	name:"/",
@@ -13,7 +34,6 @@ var fcb = [
 	},
 	iaddr:[1,2]
 	},
-
 	{
 	name:"file1",
 	meta:{
@@ -25,7 +45,6 @@ var fcb = [
 	},
 	iaddr:[3]
 	},
-
 	{
 	name:"file2",
 	meta:{
@@ -37,27 +56,23 @@ var fcb = [
 	},
 	iaddr:[4]
 	}
-]; // object-array fileinfo
-var disk = ["fcb[0]","fcb[1]","fcb[2]","This is file1.","This is file2."]; // string-array file
+];
 
-/*
-var file = {
-	name:"",
-	meta:{
-		type:"",
-		own:"",
-		mod:[true,true,true,true,true,false,true,true,false],
-		createAt:"",
-		updateAt:""
-	},
-	iaddr:[] //number-array disknum
-};
-*/
+//磁盘信息 string-array file
+var disk = [
+	"fcb[0]",
+	"fcb[1]",
+	"fcb[2]",
+	"This is file1.",
+	"This is file2."
+];
 
-var dirFileNameCache = []; //string-array filename
-var dirFcbnumCache = []; //numarray fcbnum
+// 当前目录下的文件名缓存 string-array filename
+var dirFileNameCache = [];
+// 当前目录下的FCB号缓存 numarray fcbnum
+var dirFcbnumCache = [];
 
-//Convert filename to fcbnum
+// 转换文件名到其对应i节点上的fcb号 Convert filename to fcbnum
 var find = function (filename){
 	for(var i = 0; i < dirFileNameCache.length; i++){
 		if(dirFileNameCache[i] === filename){
@@ -69,9 +84,12 @@ var find = function (filename){
 	}
 	console.log("No such file.");
 	return null;
-}
+};
 
-//refresh now dir Cache (after opening a new folder delete/create a new file/dir)
+// 刷新当前目录下的缓存
+// refresh now dir Cache 
+// 当对目录/文件进行增删或打开新目录时
+// after opening a new folder delete/create a new file/dir
 var refreshDirCache = function (dirfcb){
 	for(var i = 0; i < fcb[dirfcb].iaddr.length; i++){
 		if (fcb[dirfcb].iaddr !== undefined){
@@ -79,25 +97,25 @@ var refreshDirCache = function (dirfcb){
 			dirFileNameCache[i] = fcb[dirFcbnumCache[i]].name;
 		}
 	}
-}
+};
 
-//show user now
+// 显示当前用户 show user now
 var whoami = function (){
 	return userNow;
-}
+};
 
-//show dir now
+// 显示当前目录 show dir now
 var pwd = function (){
 	return locNow.join("");
-}
+};
 
-//switch user
+// 转换用户 switch user
 var su = function (username){
 	userNow = username;
 	return whoami();
-}
+};
 
-//show the file mode info
+// 显示文件的权限信息 show the file mode info
 var shmod = function (fcbnumTmp) {
 	var modString = ["r","w","x","r","w","x","r","w","x"];
 	var modArray = fcb[fcbnumTmp].meta.mod;
@@ -113,7 +131,7 @@ var shmod = function (fcbnumTmp) {
 	return modReturn;
 };
 
-//change the file mode info
+// 更改文件权限 change the file mode info
 var chmod = function (mod,filename) {
 	var fcbnumTmp = find(filename);
 	var modTmp = mod.toString().split("");
@@ -132,14 +150,14 @@ var chmod = function (mod,filename) {
 	fcb[fcbnumTmp].meta.mod = modArray;
 }
 
-//change the file owner
+// 更改文件所有者 change the file owner
 var chown = function (user,filename) {
 	var fcbnumTmp = find(filename);
 	var ownArray = user;
 	fcb[fcbnumTmp].meta.own = ownArray;
-}
+};
 
-//check is an act can be done or not
+// 检查读写执行动作权限 check is an act can be done or not
 var checkAct = function (act,filename) {
 	var fcbnumTmp = find(filename);
 	var i = 0;
@@ -165,11 +183,14 @@ var checkAct = function (act,filename) {
 		console.log("You don't have enough auth to finish this action!");
 		return false;
 	}
-}
+};
 
+// 检查同目录下是否有重名 check if there is a duplicate name
 var checkDuplicateName = function (filename){
 	return false;
-}
+};
+
+// 获得一个新的文件控制块 request a new FCB
 var getNewFcbNum = function (){
 	for (var i = 0; i < fcb.length; i++) {
 		if(fcb[i] === undefined){
@@ -177,7 +198,9 @@ var getNewFcbNum = function (){
 		}
 	};
 	return fcb.length;
-}
+};
+
+// 获得一个新的盘块 request a new disk block
 var getNewDiskNum = function (){
 	for (var i = 0; i < disk.length; i++) {
 		if(disk[i] === undefined){
@@ -185,15 +208,16 @@ var getNewDiskNum = function (){
 		}
 	};
 	return disk.length;
-}
+};
 
-/* FORMAT DISK*/
+/* 格式化磁盘 FORMAT DISK*/
 var format = function (){
 	refreshDirCache(0);
 	console.log(whoami());
 	console.log(pwd());
 	console.log(ll());
 }
+
 /* 文件操作 FILE ACTION */
 // 创建新文件 create file
 var touch = function (filename){
@@ -232,8 +256,9 @@ var touch = function (filename){
 	fcb[fcbnumTmp] = fileTmp;
 	refreshDirCache(dirfcbNow);
 	return true;
-}
-//read file
+};
+
+// 显示文件内容 read file
 var cat = function(filename){
 	if (checkAct("r",filename) === false){
 		return false;
@@ -245,8 +270,9 @@ var cat = function(filename){
 		catStr += disk[fcbTmp.iaddr[i]] + "\n";
 	};
 	return catStr;
-}
-//write file
+};
+
+// 向文件内部写入文本 write file
 var wt = function(filename,text){
 	if (checkAct("w",filename) === false){
 		return false;
@@ -256,8 +282,9 @@ var wt = function(filename,text){
 	disk[disknumTmp] = text;
 	fcb[fcbnumTmp].iaddr.push(disknumTmp);
 	return true;
-}
-//execute file
+};
+
+// 执行文件 execute file
 var run = function(filename){
 	if (checkAct("x",filename) === false){
 		return false;
@@ -268,19 +295,20 @@ var run = function(filename){
 		console.log(eval(disk[fcbTmp.iaddr[i]]));
 	};
 	return true;
-}
-//delete file
+};
+
+// 删除文件 delete file
 var rm = function(filename){
 	if (checkAct("w",filename) === false){
 		return false;
 	}
 	var fcbnumTmp = find(filename);
 	var fcbTmp = fcb[fcbnumTmp];
-	// 从磁盘中删除该文件内容
+	// 从磁盘中删除该文件内容 delete its file content
 	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
 		disk[fcbTmp.iaddr[i]] = undefined;
 	};
-	// 从目录中删除该文件节点
+	// 从目录中删除该文件节点 delete the file index under directory fcb
 	for (var i = 0; i < fcb[dirfcbNow].iaddr.length; i++) {
 		if (parseInt(disk[fcb[dirfcbNow].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp){
 			disk[fcb[dirfcbNow].iaddr[i]] = undefined;
@@ -290,25 +318,28 @@ var rm = function(filename){
 	};
 	fcb[dirfcbNow].iaddr.sort();
 	fcb[dirfcbNow].iaddr.pop();
-	// 释放fcb
+	// 释放文件FCB free file fcb
 	fcb[fcbnumTmp] = undefined;
 	refreshDirCache(dirfcbNow);
-}
+};
 
 /* 目录操作 DIRECTORY ACTION */
-//create directory
+// 创建新的文件夹 create directory
 var mkdir = function(){
 
-}
-//change directory
+};
+
+// 更改当前目录 change directory
 var cd = function(){
 
-}
-//show directory
+};
+
+// 删除目录 delete directory
 var rmdir = function(){
 
-}
-//file name info
+};
+
+// 显示文件信息 file name info
 var ls = function(){
 	var lsStr = "\n";
 	for (var i = 0; i < dirFileNameCache.length; i++){
@@ -316,8 +347,9 @@ var ls = function(){
 		lsStr += "    ";
 	}
 	return lsStr;
-}
-//file details info
+};
+
+// 显示文件详细信息 file details info
 var ll = function(){
 	var llStr = "\n";
 	for (var i = 0; i < dirFileNameCache.length; i++){
@@ -334,6 +366,6 @@ var ll = function(){
 		llStr += "\n";
 	}
 	return llStr;
-}
+};
 
 format();
