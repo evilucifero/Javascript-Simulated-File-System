@@ -38,7 +38,7 @@ var fcb = [
 	iaddr:[4]
 	}
 ]; // object-array fileinfo
-var disk = ["fcb[0]","fcb[1]","fcb[2]","'This is file1.'","'This is file2.'"]; // string-array file
+var disk = ["fcb[0]","fcb[1]","fcb[2]","This is file1.","This is file2."]; // string-array file
 
 /*
 var file = {
@@ -74,8 +74,10 @@ var find = function (filename){
 //refresh now dir Cache (after opening a new folder delete/create a new file/dir)
 var refreshDirCache = function (dirfcb){
 	for(var i = 0; i < fcb[dirfcb].iaddr.length; i++){
-		dirFcbnumCache[i] = parseInt(disk[fcb[dirfcb].iaddr[i]].charAt(4));
-		dirFileNameCache[i] = fcb[dirFcbnumCache[i]].name;
+		if (fcb[dirfcb].iaddr !== undefined){
+			dirFcbnumCache[i] = parseInt(disk[fcb[dirfcb].iaddr[i]].replace("fcb[","").replace("]",""));
+			dirFileNameCache[i] = fcb[dirFcbnumCache[i]].name;
+		}
 	}
 }
 
@@ -96,9 +98,9 @@ var su = function (username){
 }
 
 //show the file mode info
-var shmod = function (fcbnum) {
+var shmod = function (fcbnumTmp) {
 	var modString = ["r","w","x","r","w","x","r","w","x"];
-	var modArray = fcb[fcbnum].meta.mod;
+	var modArray = fcb[fcbnumTmp].meta.mod;
 	var modReturn = "";
 	for (var i = 0; i < 9; i++) {
 		if(modArray[i] === true) {
@@ -113,7 +115,7 @@ var shmod = function (fcbnum) {
 
 //change the file mode info
 var chmod = function (mod,filename) {
-	var fcbnum = find(filename);
+	var fcbnumTmp = find(filename);
 	var modTmp = mod.toString().split("");
 	var modArray = [];
 	for (var i = 0; i < modTmp.length; i++){
@@ -127,21 +129,21 @@ var chmod = function (mod,filename) {
 			modArray[j] = false;
 		}
 	};
-	fcb[fcbnum].meta.mod = modArray;
+	fcb[fcbnumTmp].meta.mod = modArray;
 }
 
 //change the file owner
 var chown = function (user,filename) {
-	var fcbnum = find(filename);
+	var fcbnumTmp = find(filename);
 	var ownArray = user;
-	fcb[fcbnum].meta.own = ownArray;
+	fcb[fcbnumTmp].meta.own = ownArray;
 }
 
 //check is an act can be done or not
 var checkAct = function (act,filename) {
-	var fcbnum = find(filename);
+	var fcbnumTmp = find(filename);
 	var i = 0;
-	if (userNow !== fcb[fcbnum].meta.own) {
+	if (userNow !== fcb[fcbnumTmp].meta.own) {
 		i = 6;
 	}
 	if (act === "r") {
@@ -156,7 +158,7 @@ var checkAct = function (act,filename) {
 		console.log("Wrong action!");
 		return false;
 	}
-	if(fcb[fcbnum].meta.mod[i] === true) {
+	if(fcb[fcbnumTmp].meta.mod[i] === true) {
 		return true;
 	}
 	else {
@@ -203,7 +205,7 @@ var touch = function (filename){
 		console.log("You can not create file here.")
 		return false;
 	}
-	var filetmp = {
+	var fileTmp = {
 		name:"",
 		meta:{
 			type:"-",
@@ -214,20 +216,20 @@ var touch = function (filename){
 		},
 		iaddr:[] //number-array fatnum
 	};
-	filetmp.name = filename;
-	filetmp.meta.own = userNow;
-	filetmp.meta.createAt = Date().toString();
-	filetmp.meta.updateAt = Date().toString();
+	fileTmp.name = filename;
+	fileTmp.meta.own = userNow;
+	fileTmp.meta.createAt = Date().toString();
+	fileTmp.meta.updateAt = Date().toString();
 	// 分配新的DISK空间 allocate a new disk space
-	var disknumtmp = getNewDiskNum();
+	var disknumTmp = getNewDiskNum();
 	// 分配新的FCB块 allocate a fcb
-	var fcbnumtmp = getNewFcbNum();
+	var fcbnumTmp = getNewFcbNum();
 	// 将fcb信息写入DISK
-	disk[disknumtmp] = "fcb[" + fcbnumtmp +"]";
+	disk[disknumTmp] = "fcb[" + fcbnumTmp +"]";
 	// 将盘块号写入当前目录fcb的iaddr
-	fcb[dirfcbNow].iaddr.push(disknumtmp);
+	fcb[dirfcbNow].iaddr.push(disknumTmp);
 	// 将fcb写入fcb[]
-	fcb[fcbnumtmp] = filetmp;
+	fcb[fcbnumTmp] = fileTmp;
 	refreshDirCache(dirfcbNow);
 	return true;
 }
@@ -236,11 +238,11 @@ var cat = function(filename){
 	if (checkAct("r",filename) === false){
 		return false;
 	}
-	var fcbnumtmp = find(filename);
-	var fcbtmp = fcb[fcbnumtmp];
+	var fcbnumTmp = find(filename);
+	var fcbTmp = fcb[fcbnumTmp];
 	var catStr = "\n";
-	for (var i = 0; i < fcbtmp.iaddr.length; i++) {
-		catStr += disk[fcbtmp.iaddr[i]] + "\n";
+	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
+		catStr += disk[fcbTmp.iaddr[i]] + "\n";
 	};
 	return catStr;
 }
@@ -249,10 +251,10 @@ var wt = function(filename,text){
 	if (checkAct("w",filename) === false){
 		return false;
 	}
-	var fcbnum = find(filename);
-	var disknum = getNewDiskNum();
-	disk[disknum] = text;
-	fcb[fcbnum].iaddr.push(disknum);
+	var fcbnumTmp = find(filename);
+	var disknumTmp = getNewDiskNum();
+	disk[disknumTmp] = text;
+	fcb[fcbnumTmp].iaddr.push(disknumTmp);
 	return true;
 }
 //execute file
@@ -260,16 +262,37 @@ var run = function(filename){
 	if (checkAct("x",filename) === false){
 		return false;
 	}
-	var fcbnumtmp = find(filename);
-	var fcbtmp = fcb[fcbnumtmp];
-	for (var i = 0; i < fcbtmp.iaddr.length; i++) {
-		console.log(eval(disk[fcbtmp.iaddr[i]]));
+	var fcbnumTmp = find(filename);
+	var fcbTmp = fcb[fcbnumTmp];
+	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
+		console.log(eval(disk[fcbTmp.iaddr[i]]));
 	};
 	return true;
 }
 //delete file
-var rm = function(){
-
+var rm = function(filename){
+	if (checkAct("w",filename) === false){
+		return false;
+	}
+	var fcbnumTmp = find(filename);
+	var fcbTmp = fcb[fcbnumTmp];
+	// 从磁盘中删除该文件内容
+	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
+		disk[fcbTmp.iaddr[i]] = undefined;
+	};
+	// 从目录中删除该文件节点
+	for (var i = 0; i < fcb[dirfcbNow].iaddr.length; i++) {
+		if (parseInt(disk[fcb[dirfcbNow].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp){
+			disk[fcb[dirfcbNow].iaddr[i]] = undefined;
+			fcb[dirfcbNow].iaddr[i] = undefined;
+			break;
+		}
+	};
+	fcb[dirfcbNow].iaddr.sort();
+	fcb[dirfcbNow].iaddr.pop();
+	// 释放fcb
+	fcb[fcbnumTmp] = undefined;
+	refreshDirCache(dirfcbNow);
 }
 
 /* 目录操作 DIRECTORY ACTION */
@@ -298,16 +321,16 @@ var ls = function(){
 var ll = function(){
 	var llStr = "\n";
 	for (var i = 0; i < dirFileNameCache.length; i++){
-		var tmpfcbnum = dirFcbnumCache[i];
-		var tmpfcb = fcb[tmpfcbnum];
-		llStr += tmpfcb.meta.type;
-		llStr += shmod(tmpfcbnum);
+		var fcbnumTmp = dirFcbnumCache[i];
+		var fcbTmp = fcb[fcbnumTmp];
+		llStr += fcbTmp.meta.type;
+		llStr += shmod(fcbnumTmp);
 		llStr += "  ";
-		llStr += tmpfcb.meta.own;
+		llStr += fcbTmp.meta.own;
 		llStr += "  ";
-		llStr += tmpfcb.name;
+		llStr += fcbTmp.name;
 		llStr += "  ";
-		llStr += tmpfcb.meta.updateAt;
+		llStr += fcbTmp.meta.updateAt;
 		llStr += "\n";
 	}
 	return llStr;
