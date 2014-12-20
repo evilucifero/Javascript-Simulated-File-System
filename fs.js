@@ -5,7 +5,7 @@ var userNow = "root";
 var locNow = ["/"];
 
 // 全局变量，显示当前目录的FCB号 number fcbnum
-var dirfcbNow = 0;
+var dirfcbNow = 1;
 
 // 文件控制块  object-array fileinfo
 /*
@@ -26,14 +26,27 @@ var dirfcbNow = 0;
  */
 var fcb = [
 	{
+		name:null,
+		meta:{
+			type:"n",
+			own:null,
+			mod:[false,false,false,false,false,false,false,false,false],
+			createAt:0,
+			updateAt:0
+		},
+		pfcb:null,
+		iaddr:[]
+	},
+	{
 		name:"/",
 		meta:{
 			type:"d",
 			own:"root",
 			mod:[true,true,true,true,true,false,true,true,false],
-			createAt:"",
-			updateAt:""
+			createAt:1418995724279,
+			updateAt:1418995724279
 		},
+		pfcb:0,
 		iaddr:[1,2]
 	},
 	{
@@ -41,10 +54,11 @@ var fcb = [
 		meta:{
 			type:"-",
 			own:"root",
-			mod:[true,true,true,true,true,false,true,true,false],
+			mod:[true,true,true,true,false,false,true,false,false],
 			createAt:1418995724279,
 			updateAt:1418995724279
 		},
+		pfcb:1,
 		iaddr:[3]
 	},
 	{
@@ -52,19 +66,20 @@ var fcb = [
 		meta:{
 			type:"-",
 			own:"root",
-			mod:[true,true,true,true,true,false,true,true,false],
+			mod:[true,true,true,true,false,false,true,false,false],
 			createAt:1418995724279,
 			updateAt:1418995724279
 		},
+		pfcb:1,
 		iaddr:[4]
 	}
 ];
 
 // 磁盘信息 string-array file
 var disk = [
-	"fcb[0]",
 	"fcb[1]",
 	"fcb[2]",
+	"fcb[3]",
 	"This is file1.",
 	"This is file2."
 ];
@@ -81,9 +96,6 @@ var find = function (filename) {
 			return dirFcbnumCache[i];	
 		}
 	}
-	if (filename === ".") {
-		return dirfcbNow;
-	}
 	console.log("No such file.");
 	return null;
 };
@@ -93,9 +105,9 @@ var find = function (filename) {
 // 当对目录/文件进行增删或打开新目录时
 // after opening a new folder delete/create a new file/dir
 var refreshDirCache = function (dirfcb) {
-	var count = 0;
-	dirFcbnumCache = [];
-	dirFileNameCache = [];
+	var count = 2;
+	dirFcbnumCache = [fcb[dirfcbNow].pfcb,dirfcbNow];
+	dirFileNameCache = ["..","."];
 	for (var i = 0; i < fcb[dirfcb].iaddr.length; i++) {
 		if (fcb[dirfcb].iaddr !== undefined) {
 			dirFcbnumCache[count] = parseInt(disk[fcb[dirfcb].iaddr[i]].replace("fcb[","").replace("]",""));
@@ -112,7 +124,7 @@ var whoami = function () {
 
 // 显示当前目录 show dir now
 var pwd = function () {
-	return locNow.join("");
+	return locNow.join("/");
 };
 
 // 转换用户 switch user
@@ -224,28 +236,49 @@ var getNewDiskNum = function () {
 };
 
 // 通过时间戳翻回时间字符串 convert UNIX-timestamp to time-string
+var pad = function (num, n) {
+    var len = num.toString().length;
+    while(len < n) {
+        num = "0" + num;
+        len++;
+    }
+    return num;
+}
 var shtime = function (unixtime) {
 	var d = new Date(unixtime);
-	return ""+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+"/"+d.getHours()+":"+d.getMinutes()+":"+d.getSeconds();
+	return ""+d.getFullYear()+"-"+pad(d.getMonth()+1,2)+"-"+pad(d.getDate(),2)+"/"+pad(d.getHours(),2)+":"+pad(d.getMinutes(),2)+":"+pad(d.getSeconds(),2);
 }
 
 /* 格式化磁盘 FORMAT DISK */
-var format = function () {
-	refreshDirCache(0);
-	console.log(whoami());
-	console.log(pwd());
-	console.log(ll());
+var init = function () {
+	refreshDirCache(1);
+	mkdir("bin");
+	mkdir("etc");
+	mkdir("usr");
+	mkdir("var");
+	mkdir("mnt");
+	touch("runfile");
+	vi("runfile","console.log(Date());");
+	mkdir(".hiddendir");
+	touch(".hiddenfile");
+	mcd("bin");
+	mkdir("dir1");
+	mkdir("dir2");
+	touch("file1");
+	touch("file2");
+	mcd("..");
+	console.log("login as: " + whoami());
+	console.log("working directory: " + pwd());
 }
 
 /* 文件操作 FILE ACTION */
 // 创建新文件 create file
 var touch = function (filename) {
 	if (checkDuplicateName(filename) === true) {
-		console.log("Already have a same filename, please change a new filename!")
+		console.log("Already have a same name, please choose a new filename!");
 		return false;
 	}
 	if (checkAct("w",".") === false) {
-		console.log("You can not create file here.")
 		return false;
 	}
 	var fileTmp = {
@@ -253,17 +286,21 @@ var touch = function (filename) {
 		meta:{
 			type:"-",
 			own:"",
-			mod:[true,true,true,true,true,false,true,true,false],
+			mod:[true,true,true,true,false,false,true,false,false],
 			createAt:"",
 			updateAt:""
 		},
+		pfcb:0,
 		iaddr:[]
 	};
 	fileTmp.name = filename;
 	fileTmp.meta.own = userNow;
+	// 设置其父级文件夹FCB setting its parent directory fcn number
+	fileTmp.pfcb = dirfcbNow;
 	var d = new Date();
 	fileTmp.meta.createAt = d.getTime();
 	fileTmp.meta.updateAt = d.getTime();
+	fcb[fileTmp.pfcb].meta.updateAt = d.getTime();
 	// 分配新的DISK空间 allocate a new disk space
 	var disknumTmp = getNewDiskNum();
 	// 分配新的FCB块 allocate a fcb
@@ -293,16 +330,25 @@ var cat = function (filename) {
 };
 
 // 向文件内部写入文本 write file
-var wt = function (filename,text) {
+var vi = function (filename,text) {
 	if (checkAct("w",filename) === false) {
 		return false;
 	}
+	if (checkDuplicateName(filename) === false) {
+		touch(filename);
+	};
 	var fcbnumTmp = find(filename);
+	var fcbTmp = fcb[fcbnumTmp];
+	if (fcbTmp.meta.type !== "-") {
+		console.log(filename + " is not a file, cannot be edited.");
+		return false;
+	}
 	var disknumTmp = getNewDiskNum();
 	disk[disknumTmp] = text;
 	var d = new Date();
-	fcb[fcbnumTmp].meta.updateAt = d.getTime();
-	fcb[fcbnumTmp].iaddr.push(disknumTmp);
+	fcbTmp.meta.updateAt = d.getTime();
+	fcb[fcbTmp.pfcb].meta.updateAt = d.getTime();
+	fcbTmp.iaddr.push(disknumTmp);
 	return true;
 };
 
@@ -311,13 +357,22 @@ var run = function (filename) {
 	if (checkAct("x",filename) === false) {
 		return false;
 	}
+	if (checkDuplicateName(filename) === false) {
+		console.log(filename + " is not existed.");
+		return false;
+	};
 	var fcbnumTmp = find(filename);
 	var fcbTmp = fcb[fcbnumTmp];
+	if (fcbTmp.meta.type !== "-") {
+		console.log(filename + " is not a file, cannot be run.");
+		return false;
+	}
 	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
 		console.log(eval(disk[fcbTmp.iaddr[i]]));
 	};
 	return true;
 };
+
 // 删除文件 delete file
 var rm = function (filename) {
 	if (checkAct("w",filename) === false) {
@@ -325,46 +380,167 @@ var rm = function (filename) {
 	}
 	var fcbnumTmp = find(filename);
 	var fcbTmp = fcb[fcbnumTmp];
+	// 检测是否为目录 check if it is a diretory
+	if (fcbTmp.meta.type === "d") {
+		console.log(filename + " is a diretory, please use 'rmdir' instead.");
+		return false;
+	};
 	// 从磁盘中删除该文件内容 delete its file content
 	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
 		disk[fcbTmp.iaddr[i]] = undefined;
 	};
 	// 从目录中删除该文件节点 delete the file index under directory fcb
-	for (var i = 0; i < fcb[dirfcbNow].iaddr.length; i++) {
-		if (parseInt(disk[fcb[dirfcbNow].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
-			disk[fcb[dirfcbNow].iaddr[i]] = undefined;
-			fcb[dirfcbNow].iaddr.splice(i,1);
+	for (var i = 0; i < fcb[fcbTmp.pfcb].iaddr.length; i++) {
+		if (parseInt(disk[fcb[fcbTmp.pfcb].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
+			disk[fcb[fcbTmp.pfcb].iaddr[i]] = undefined;
+			fcb[fcbTmp.pfcb].iaddr.splice(i,1);
 			break;
 		}
 	};
-	// 释放文件FCB free file fcb
-	fcb[fcbnumTmp] = undefined;
+	// 释放文件控制块 free file fcb
 	refreshDirCache(dirfcbNow);
+	fcb[fcbnumTmp] = undefined;
 	return true;
 };
 
 /* 目录操作 DIRECTORY ACTION */
-// 创建新的文件夹 create directory
-var mkdir = function () {
 
+// 创建新的文件夹 create directory
+var mkdir = function (dirname) {
+	if (checkDuplicateName(dirname) === true) {
+		console.log("Already have a same name, please choose a new directory name!")
+		return false;
+	}
+	if (checkAct("w",".") === false) {
+		return false;
+	}
+	var dirTmp = {
+		name:"",
+		meta:{
+			type:"d",
+			own:"",
+			mod:[true,true,true,true,false,false,true,false,false],
+			createAt:"",
+			updateAt:""
+		},
+		pfcb:0,
+		iaddr:[]
+	};
+	dirTmp.name = dirname;
+	dirTmp.meta.own = userNow;
+	// 设置其父级文件夹FCB setting its parent directory fcn number
+	dirTmp.pfcb = dirfcbNow;
+	var d = new Date();
+	dirTmp.meta.createAt = d.getTime();
+	dirTmp.meta.updateAt = d.getTime();
+	fcb[dirTmp.pfcb].meta.updateAt = d.getTime();
+	// 分配新的DISK空间 allocate a new disk space
+	var disknumTmp = getNewDiskNum();
+	// 分配新的FCB块 allocate a fcb
+	var fcbnumTmp = getNewFcbNum();
+	// 将fcb信息写入DISK
+	disk[disknumTmp] = "fcb[" + fcbnumTmp +"]";
+	// 将盘块号写入当前目录fcb的iaddr
+	fcb[dirfcbNow].iaddr.push(disknumTmp);
+	// 将fcb写入fcb[]
+	fcb[fcbnumTmp] = dirTmp;
+	refreshDirCache(dirfcbNow);
+	return true;
 };
 
 // 更改当前目录 change directory
-var cd = function () {
-
+var mcd = function (dirname) {
+	if (checkDuplicateName(dirname) === false) {
+		console.log(dirname + " is not existed.")
+		return false;
+	}
+	if (checkAct("r",dirname) === false) {
+		return false;
+	}
+	if (dirname === ".") {}
+	else if (dirname === "..") {
+		dirfcbNow = dirFcbnumCache[0];
+		locNow.pop();
+	}
+	else {
+		dirfcbNow = find(dirname);
+		locNow.push(dirname);
+	}
+	refreshDirCache(dirfcbNow);
+	return true;
 };
 
 // 删除目录 delete directory
-var rmdir = function () {
-
+var rmdir = function (dirname) {
+	if (checkAct("w",dirname) === false) {
+		return false;
+	}
+	var fcbnumTmp = find(dirname);
+	var fcbTmp = fcb[fcbnumTmp];
+	// 检测是否为目录 check if it is a diretory
+	if (fcbTmp.meta.type !== "d") {
+		console.log(dirname + " is not a directory, try 'rm' instead.");
+		return false;
+	};
+	// 检查目录下是否还有其他文件
+	if (fcbTmp.iaddr.length !== 0) {
+		console.log(dirname + " is not empty, try 'rmrf' instead.");
+		return false;
+	}
+	// 从目录中删除该目录节点 delete the dir index under directory fcb
+	for (var i = 0; i < fcb[fcbTmp.pfcb].iaddr.length; i++) {
+		if (parseInt(disk[fcb[fcbTmp.pfcb].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
+			disk[fcb[fcbTmp.pfcb].iaddr[i]] = undefined;
+			fcb[fcbTmp.pfcb].iaddr.splice(i,1);
+			break;
+		}
+	};
+	// 释放文件控制块 free dir fcb
+	refreshDirCache(dirfcbNow);
+	fcb[fcbnumTmp] = undefined;
+	return true;
 };
+
+// 强制递归删除 forcely delete directory
+var rmrf = function (elename) {
+	if (checkAct("w",elename) === false) {
+		return false;
+	}
+	var fcbnumTmp = find(elename);
+	var fcbTmp = fcb[fcbnumTmp];
+	// 检测是否为目录 check if it is a diretory
+	if (fcbTmp.meta.type === "d")
+	{
+		// 目录处理方式
+		// 检查目录下是否还有其他文件
+		if (fcbTmp.iaddr.length === 0) {
+			rmdir(elename);
+		}
+		else {
+			mcd(elename);
+			var len = dirFileNameCache.length;
+			for (var i = 2; i < len; i++) {
+				rmrf(dirFileNameCache[2]);
+			};
+			mcd("..");
+			rmdir(elename);
+		}
+	}
+	else {
+		// 文件处理方式
+		rm(elename);
+	}
+	return true;
+}
 
 // 显示文件信息 file name info
 var ls = function () {
 	var lsStr = "\n";
 	for (var i = 0; i < dirFileNameCache.length; i++) {
-		lsStr += dirFileNameCache[i];
-		lsStr += "  ";
+		if (dirFileNameCache[i].charAt(0) !== ".") {
+			lsStr += dirFileNameCache[i];
+			lsStr += "  ";
+		}
 	}
 	return lsStr;
 };
@@ -379,15 +555,15 @@ var ll = function () {
 		llStr += shmod(fcbnumTmp);
 		llStr += "  ";
 		llStr += fcbTmp.meta.own;
-		llStr += "  ";
-		llStr += fcbTmp.name;
 		llStr += "  C";
 		llStr += shtime(fcbTmp.meta.createAt);
 		llStr += "  U";
 		llStr += shtime(fcbTmp.meta.updateAt);
+		llStr += "      ";
+		llStr += dirFileNameCache[i];
 		llStr += "\n";
 	}
 	return llStr;
 };
 
-format();
+init();
