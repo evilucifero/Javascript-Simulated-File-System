@@ -1,3 +1,10 @@
+/* TODOLIST
+ * 0、完成绝对路径的改造，实现所有的东西只要写着filename的地方均可以使用绝对路径
+ * 1、完成读取函数，实现所有的盘块均只存储定长字节
+ * 2、完成DISK的改造以满足需求1
+ * 3、完成索引函数，实现混合索引、
+ */
+
 // 全局变量，显示当前用户名 string name
 var userNow = "root";
 
@@ -88,6 +95,16 @@ var disk = [
 var dirFileNameCache = [];
 // 当前目录下的FCB号缓存 numarray fcbnum
 var dirFcbnumCache = [];
+
+// 未完成，预设中，读取文本文档
+var fread = function(fcbnum){
+
+}
+
+// 未完成，预设中，索引设置
+var index = function () {
+
+}
 
 // 转换文件名到其对应i节点上的fcb号 Convert filename to fcbnum
 var find = function (filename) {
