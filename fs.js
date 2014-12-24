@@ -87,8 +87,8 @@ var disk = [
 	"fcb[1]",
 	"fcb[2]",
 	"fcb[3]",
-	"This is file1.",
-	"This is file2."
+	"This is f1",
+	"This is f2"
 ];
 
 // 当前目录下的文件名缓存 string-array filename
@@ -96,13 +96,58 @@ var dirFileNameCache = [];
 // 当前目录下的FCB号缓存 numarray fcbnum
 var dirFcbnumCache = [];
 
-// 未完成，预设中，读取文本文档
-var fread = function(fcbnum){
+// 未完成，预设中，文本文档
+var getStream = function (fcbnum) {
+
+}
+
+var getBlock = function (disknum) {
+
+}
+
+var setStream = function (fcnnum,pattern,streamstr) {
+
+}
+
+var setBlock = function (disknum,blockstr) {
 
 }
 
 // 未完成，预设中，索引设置
-var index = function () {
+var getIndex = function (disknum) {
+	return JSON.parse(disk[disknum]);
+}
+
+var getValue = function (fcbnum,indexnum) {
+	if (indexnum < 10) {
+		return fcb[fcbnum].iaddr[indexnum];
+	}
+	else if (indexnum < 20) {
+		var firstIndexDisknum = fcb[fcbnum].iaddr[10];
+		var firstIndex = getIndex(firstIndexDisknum);
+		return firstIndex[indexnum - 10];
+	}
+	else if (indexnum < 110) {
+		var secondIndexDisknum = fcb[fcnnum].iaddr[11];
+		var secondIndex = getIndex[secondIndexDisknum];
+		var firstIndexDisknum = secondIndex[parseInt((indexnum - 20) / 10)];
+		var firstIndex = getIndex(firstIndexDisknum);
+		return firstIndex[(indexnum - 20) % 10];
+	}
+	else {
+		console.log("Out of Maxium File Bounder!");
+		return false;
+	}
+}
+
+var setIndex = function (value,disknum) {
+	var indexArray = JSON.parse(disk[disknum]);
+	indexArray.push(value);
+	disk[disknum] = JSON.stringify(indexArray);
+	return true;
+}
+
+var setValue = function (value,fcbnum) {
 
 }
 
