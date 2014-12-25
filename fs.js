@@ -1,6 +1,7 @@
 /* TODOLIST
- * 0、完成绝对路径的改造，实现所有的东西只要写着filename的地方均可以使用绝对路径
- * 1、完成索引函数，实现混合索引
+ * (0) 完成绝对路径的改造，实现所有的东西只要写着filename的地方均可以使用绝对路径
+ * (1) 完成索引函数，实现混合索引
+ * (2) 实现多种写入方式，现在只有追加，以后还要添加覆盖
  */
 
 // 全局变量，显示当前用户名 string name
@@ -636,7 +637,9 @@ var init = function () {
 	mkdir("dir1");
 	mkdir("dir2");
 	touch("file1");
+	vi("file1","qwertyuipte4wwyuiaeryuioaasuyeuriurqfuhfqewhufuhfqewohfweowefhqohwfe");
 	touch("file2");
+	vi("file2","happy")
 	cd("..");
 	console.log("login as: " + whoami());
 	console.log("working directory: " + pwd());
