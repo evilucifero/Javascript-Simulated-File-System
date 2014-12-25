@@ -93,24 +93,52 @@ var disk = [
 
 // 当前目录下的文件名缓存 string-array filename
 var dirFileNameCache = [];
+
 // 当前目录下的FCB号缓存 numarray fcbnum
 var dirFcbnumCache = [];
 
+// 检查同目录下是否有重名 check if there is a duplicate name
+var checkDuplicateName = function (filename) {
+	for (var i = 0; i < dirFileNameCache.length; i++) {
+		if (dirFileNameCache[i] === filename) {
+			return true;
+		};
+	};
+	return false;
+};
+
+// 获得一个新的文件控制块 request a new FCB
+var getNewFcbNum = function () {
+	for (var i = 0; i < fcb.length; i++) {
+		if (fcb[i] === undefined) {
+			return i;
+		}
+	};
+	return fcb.length;
+};
+
+// 获得一个新的盘块 request a new disk block
+var getNewDiskNum = function () {
+	for (var i = 0; i < disk.length; i++) {
+		if (disk[i] === undefined) {
+			return i;
+		}
+	};
+	return disk.length;
+};
+
 // 未完成，预设中，文本文档
-var getStream = function (fcbnum) {
-
+var getValue = function (fcbnum) {
+	var addrArray = fcb[fcbnum].iaddr; // = getBlocks(fcbnum);
+	var strTmp = "";
+	for (var i = 0; i < addrArray.length; i++) {
+		strTmp += addrArray[i];
+	};
+	return strTmp;
 }
 
-var getBlock = function (disknum) {
-
-}
-
-var setStream = function (fcnnum,pattern,streamstr) {
-
-}
-
-var setBlock = function (disknum,blockstr) {
-
+var setValue = function (fcbnum,streamstr) {
+	
 }
 
 // 未完成，预设中，索引设置
@@ -118,7 +146,7 @@ var getIndex = function (disknum) {
 	return JSON.parse(disk[disknum]);
 }
 
-var getValue = function (fcbnum,indexnum) {
+var getBlocks = function (fcbnum,indexnum) {
 	if (indexnum < 10) {
 		return fcb[fcbnum].iaddr[indexnum];
 	}
@@ -147,7 +175,7 @@ var setIndex = function (value,disknum) {
 	return true;
 }
 
-var setValue = function (value,fcbnum) {
+var setBlocks = function (value,fcbnum) {
 
 }
 
@@ -267,36 +295,6 @@ var checkAct = function (act,filename) {
 	}
 };
 
-// 检查同目录下是否有重名 check if there is a duplicate name
-var checkDuplicateName = function (filename) {
-	for (var i = 0; i < dirFileNameCache.length; i++) {
-		if (dirFileNameCache[i] === filename) {
-			return true;
-		};
-	};
-	return false;
-};
-
-// 获得一个新的文件控制块 request a new FCB
-var getNewFcbNum = function () {
-	for (var i = 0; i < fcb.length; i++) {
-		if (fcb[i] === undefined) {
-			return i;
-		}
-	};
-	return fcb.length;
-};
-
-// 获得一个新的盘块 request a new disk block
-var getNewDiskNum = function () {
-	for (var i = 0; i < disk.length; i++) {
-		if (disk[i] === undefined) {
-			return i;
-		}
-	};
-	return disk.length;
-};
-
 // 通过时间戳翻回时间字符串 convert UNIX-timestamp to time-string
 var pad = function (num, n) {
     var len = num.toString().length;
@@ -306,31 +304,10 @@ var pad = function (num, n) {
     }
     return num;
 }
+
 var shtime = function (unixtime) {
 	var d = new Date(unixtime);
 	return ""+d.getFullYear()+"-"+pad(d.getMonth()+1,2)+"-"+pad(d.getDate(),2)+"/"+pad(d.getHours(),2)+":"+pad(d.getMinutes(),2)+":"+pad(d.getSeconds(),2);
-}
-
-/* 格式化磁盘 FORMAT DISK */
-var init = function () {
-	refreshDirCache(1);
-	mkdir("bin");
-	mkdir("etc");
-	mkdir("usr");
-	mkdir("var");
-	mkdir("mnt");
-	touch("runfile");
-	vi("runfile","console.log(Date());");
-	mkdir(".hiddendir");
-	touch(".hiddenfile");
-	mcd("bin");
-	mkdir("dir1");
-	mkdir("dir2");
-	touch("file1");
-	touch("file2");
-	mcd("..");
-	console.log("login as: " + whoami());
-	console.log("working directory: " + pwd());
 }
 
 /* 文件操作 FILE ACTION */
@@ -511,7 +488,7 @@ var mkdir = function (dirname) {
 };
 
 // 更改当前目录 change directory
-var mcd = function (dirname) {
+var cd = function (dirname) {
 	if (checkDuplicateName(dirname) === false) {
 		console.log(dirname + " is not existed.")
 		return false;
@@ -579,12 +556,12 @@ var rmrf = function (elename) {
 			rmdir(elename);
 		}
 		else {
-			mcd(elename);
+			cd(elename);
 			var len = dirFileNameCache.length;
 			for (var i = 2; i < len; i++) {
 				rmrf(dirFileNameCache[2]);
 			};
-			mcd("..");
+			cd("..");
 			rmdir(elename);
 		}
 	}
@@ -627,5 +604,27 @@ var ll = function () {
 	}
 	return llStr;
 };
+
+/* 初始化磁盘 INIT DISK */
+var init = function () {
+	refreshDirCache(1);
+	mkdir("bin");
+	mkdir("etc");
+	mkdir("usr");
+	mkdir("var");
+	mkdir("mnt");
+	touch("runfile");
+	vi("runfile","console.log(Date());");
+	mkdir(".hiddendir");
+	touch(".hiddenfile");
+	cd("bin");
+	mkdir("dir1");
+	mkdir("dir2");
+	touch("file1");
+	touch("file2");
+	cd("..");
+	console.log("login as: " + whoami());
+	console.log("working directory: " + pwd());
+}
 
 init();
