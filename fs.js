@@ -55,44 +55,15 @@ var fcb = [
 			updateAt:1418995724279
 		},
 		pfcb:0,
-		iaddr:[1,2]
-	},
-	{
-		name:"file1",
-		meta:{
-			type:"-",
-			own:"root",
-			mod:[true,true,true,true,false,false,true,false,false],
-			createAt:1418995724279,
-			updateAt:1418995724279
-		},
-		pfcb:1,
-		iaddr:[3]
-	},
-	{
-		name:"file2",
-		meta:{
-			type:"-",
-			own:"root",
-			mod:[true,true,true,true,false,false,true,false,false],
-			createAt:1418995724279,
-			updateAt:1418995724279
-		},
-		pfcb:1,
-		iaddr:[4]
+		iaddr:[]
 	}
 ];
 
 // 磁盘信息 string-array file
-var disk = [
-	"fcb[1]",
-	"fcb[2]",
-	"fcb[3]",
-	"This is f1",
-	"This is f2"
-];
+var bitmap = [true];
+var disk = ["fcb[1]"];
 
-// 当前目录下的文件名缓存 string-array filename
+// 当前目录f下的文件名缓存 string-array filename
 var dirFileNameCache = [];
 
 // 当前目录下的FCB号缓存 numarray fcbnum
@@ -150,6 +121,7 @@ var setValue = function (fcbnum,streamstr) {
 	var nowDisknum;
 	if (fcbTmp.iaddr.length === 0) {
 		nowDisknum = getNewDiskNum();
+		bitmap[nowDisknum] = true;
 		disk[nowDisknum] = "";
 		fcbTmp.iaddr.push(nowDisknum);
 	}
@@ -157,9 +129,10 @@ var setValue = function (fcbnum,streamstr) {
 		nowDisknum = fcbTmp.iaddr[(fcbTmp.iaddr.length-1)];	
 	}
 	while (streamArray.length !== 0) {
-		if (isDiskFull(nowDisknum) === true){
+		if (isDiskFull(nowDisknum) === true) {
 			nowDisknum = getNewDiskNum();
 			disk[nowDisknum] = "";
+			bitmap[nowDisknum] = true;
 			fcbTmp.iaddr.push(nowDisknum);
 		}
 		disk[nowDisknum] += streamArray.shift();
@@ -371,6 +344,7 @@ var touch = function (filename) {
 	// 分配新的FCB块 allocate a fcb
 	var fcbnumTmp = getNewFcbNum();
 	// 将fcb信息写入DISK
+	bitmap[disknumTmp] = true;
 	disk[disknumTmp] = "fcb[" + fcbnumTmp +"]";
 	// 将盘块号写入当前目录fcb的iaddr
 	fcb[dirfcbNow].iaddr.push(disknumTmp);
@@ -443,11 +417,13 @@ var rm = function (filename) {
 	};
 	// 从磁盘中删除该文件内容 delete its file content
 	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
+		bitmap[fcbTmp.iaddr[i]] = false;
 		disk[fcbTmp.iaddr[i]] = undefined;
 	};
 	// 从目录中删除该文件节点 delete the file index under directory fcb
 	for (var i = 0; i < fcb[fcbTmp.pfcb].iaddr.length; i++) {
 		if (parseInt(disk[fcb[fcbTmp.pfcb].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
+			bitmap[fcb[fcbTmp.pfcb].iaddr[i]] = false;
 			disk[fcb[fcbTmp.pfcb].iaddr[i]] = undefined;
 			fcb[fcbTmp.pfcb].iaddr.splice(i,1);
 			break;
@@ -495,6 +471,7 @@ var mkdir = function (dirname) {
 	// 分配新的FCB块 allocate a fcb
 	var fcbnumTmp = getNewFcbNum();
 	// 将fcb信息写入DISK
+	bitmap[disknumTmp] = true;
 	disk[disknumTmp] = "fcb[" + fcbnumTmp +"]";
 	// 将盘块号写入当前目录fcb的iaddr
 	fcb[dirfcbNow].iaddr.push(disknumTmp);
@@ -546,6 +523,7 @@ var rmdir = function (dirname) {
 	// 从目录中删除该目录节点 delete the dir index under directory fcb
 	for (var i = 0; i < fcb[fcbTmp.pfcb].iaddr.length; i++) {
 		if (parseInt(disk[fcb[fcbTmp.pfcb].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
+			bitmap[fcb[fcbTmp.pfcb].iaddr[i]] = false;
 			disk[fcb[fcbTmp.pfcb].iaddr[i]] = undefined;
 			fcb[fcbTmp.pfcb].iaddr.splice(i,1);
 			break;
@@ -624,6 +602,10 @@ var ll = function () {
 
 /* 初始化磁盘 INIT DISK */
 var init = function () {
+	bitmap[0] = true;
+	for (var i = 1; i < 1024; i++) {
+		bitmap[i] = false;
+	}
 	refreshDirCache(1);
 	mkdir("bin");
 	mkdir("etc");
