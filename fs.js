@@ -1,8 +1,6 @@
 /* TODOLIST
  * 0、完成绝对路径的改造，实现所有的东西只要写着filename的地方均可以使用绝对路径
- * 1、完成读取函数，实现所有的盘块均只存储定长字节
- * 2、完成DISK的改造以满足需求1
- * 3、完成索引函数，实现混合索引、
+ * 1、完成索引函数，实现混合索引
  */
 
 // 全局变量，显示当前用户名 string name
@@ -27,6 +25,7 @@ var dirfcbNow = 1;
  *			createAt:"",
  *			updateAt:""
  *		},
+ *		pfcb:1;
  *		iaddr:[] //number-array disknum
  *	};
  *
@@ -127,18 +126,43 @@ var getNewDiskNum = function () {
 	return disk.length;
 };
 
-// 未完成，预设中，文本文档
+// 文本文档的读取
 var getValue = function (fcbnum) {
 	var addrArray = fcb[fcbnum].iaddr; // = getBlocks(fcbnum);
 	var strTmp = "";
 	for (var i = 0; i < addrArray.length; i++) {
-		strTmp += addrArray[i];
+		strTmp += disk[addrArray[i]];
 	};
 	return strTmp;
 }
 
+// 检查单盘块是否已满 
+var isDiskFull = function (disknum) {
+	return !(disk[disknum].length < 10);
+}
+
+// 文本文档的写入
 var setValue = function (fcbnum,streamstr) {
-	
+	var streamArray = streamstr.split("");
+	var fcbTmp = fcb[fcbnum];
+	var nowDisknum;
+	if (fcbTmp.iaddr.length === 0) {
+		nowDisknum = getNewDiskNum();
+		disk[nowDisknum] = "";
+		fcbTmp.iaddr.push(nowDisknum);
+	}
+	else {
+		nowDisknum = fcbTmp.iaddr[(fcbTmp.iaddr.length-1)];	
+	}
+	while (streamArray.length !== 0) {
+		if (isDiskFull(nowDisknum) === true){
+			nowDisknum = getNewDiskNum();
+			disk[nowDisknum] = "";
+			fcbTmp.iaddr.push(nowDisknum);
+		}
+		disk[nowDisknum] += streamArray.shift();
+	}
+	return true;
 }
 
 // 未完成，预设中，索引设置
@@ -155,7 +179,7 @@ var getBlocks = function (fcbnum,indexnum) {
 		var firstIndex = getIndex(firstIndexDisknum);
 		return firstIndex[indexnum - 10];
 	}
-	else if (indexnum < 110) {
+	else if (indexnum < 120) {
 		var secondIndexDisknum = fcb[fcnnum].iaddr[11];
 		var secondIndex = getIndex[secondIndexDisknum];
 		var firstIndexDisknum = secondIndex[parseInt((indexnum - 20) / 10)];
@@ -360,12 +384,7 @@ var cat = function (filename) {
 		return false;
 	}
 	var fcbnumTmp = find(filename);
-	var fcbTmp = fcb[fcbnumTmp];
-	var catStr = "\n";
-	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
-		catStr += disk[fcbTmp.iaddr[i]] + "\n";
-	};
-	return catStr;
+	return getValue(fcbnumTmp);
 };
 
 // 向文件内部写入文本 write file
@@ -382,12 +401,10 @@ var vi = function (filename,text) {
 		console.log(filename + " is not a file, cannot be edited.");
 		return false;
 	}
-	var disknumTmp = getNewDiskNum();
-	disk[disknumTmp] = text;
+	setValue(fcbnumTmp,text);
 	var d = new Date();
 	fcbTmp.meta.updateAt = d.getTime();
 	fcb[fcbTmp.pfcb].meta.updateAt = d.getTime();
-	fcbTmp.iaddr.push(disknumTmp);
 	return true;
 };
 
@@ -406,9 +423,7 @@ var run = function (filename) {
 		console.log(filename + " is not a file, cannot be run.");
 		return false;
 	}
-	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
-		console.log(eval(disk[fcbTmp.iaddr[i]]));
-	};
+	console.log(eval(getValue(fcbnumTmp)));
 	return true;
 };
 
