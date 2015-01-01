@@ -6,61 +6,17 @@
  */
 
 // 全局变量，显示当前用户名 string name
-var userNow = "root";
+var userNow = "";
 
 // 全局变量，显示当前路径 string-array dirname
-var locNow = ["/"];
+var locNow = [];
 
 // 全局变量，显示当前目录的FCB的磁盘号 number-fcb disknum
-var dirfcbNow = 1;
-
-// 文件控制块  object-array fileinfo
-/*
- *  FCB文件控制块格式范例
- *
- *	var file = {
- *		name:"",
- *		meta:{
- *			type:"",
- *			own:"",
- *			mod:[true,true,true,true,true,false,true,true,false],
- *			createAt:"",
- *			updateAt:""
- *		},
- *		pfcb:1;
- *		iaddr:[] //number-array disknum
- *	};
- *
- */
+var dirfcbNow = 0;
 
 // 磁盘信息 string-array file
-var bitmap = [true];
-var disk = [
-	{
-		name:null,
-		meta:{
-			type:"n",
-			own:null,
-			mod:[false,false,false,false,false,false,false,false,false],
-			createAt:0,
-			updateAt:0
-		},
-		pfcb:null,
-		iaddr:[]
-	},
-	{
-		name:"/",
-		meta:{
-			type:"d",
-			own:"root",
-			mod:[true,true,true,true,true,false,true,true,false],
-			createAt:1418995724279,
-			updateAt:1418995724279
-		},
-		pfcb:0,
-		iaddr:[]
-	}
-	];
+var bitmap = [];
+var disk = [];
 
 // 当前目录f下的文件名缓存 string-array filename
 var dirFileNameCache = [];
@@ -78,24 +34,15 @@ var checkDuplicateName = function (filename) {
 	return false;
 };
 
-// 获得一个新的文件控制块 request a new FCB
-// var getNewFcbNum = function () {
-// 	for (var i = 0; i < fcb.length; i++) {
-// 		if (fcb[i] === undefined) {
-// 			return i;
-// 		}
-// 	};
-// 	return fcb.length;
-// };
-
 // 获得一个新的盘块 request a new disk block
 var getNewDiskNum = function () {
-	for (var i = 0; i < disk.length; i++) {
-		if (disk[i] === undefined) {
+	for (var i = 0; i < bitmap.length; i++) {
+		if (bitmap[i] === false) {
 			return i;
 		}
 	};
-	return disk.length;
+	console.log("Disk is full. Please delete some unimportant files.")
+	return false;
 };
 
 // 文本文档的读取
@@ -268,6 +215,9 @@ var chown = function (user,filename) {
 // 检查读写执行动作权限 check is an act can be done or not
 var checkAct = function (act,filename) {
 	var fcbnumTmp = find(filename);
+	if (fcbnumTmp === false) {
+		return false;
+	}
 	var i = 0;
 	if (userNow !== disk[fcbnumTmp].meta.own) {
 		i = 6;
@@ -323,7 +273,7 @@ var touch = function (filename) {
 		meta:{
 			type:"-",
 			own:"",
-			mod:[true,true,true,true,false,false,true,false,false],
+			mod:[true,true,true,true,true,false,true,true,false],
 			createAt:"",
 			updateAt:""
 		},
@@ -339,17 +289,13 @@ var touch = function (filename) {
 	fileTmp.meta.createAt = d.getTime();
 	fileTmp.meta.updateAt = d.getTime();
 	disk[fileTmp.pfcb].meta.updateAt = d.getTime();
-	// 分配新的DISK空间 allocate a new disk space
-	// var disknumTmp = getNewDiskNum();
-	// 分配新的FCB块 allocate a fcb
-	var fcbnumTmp = getNewDiskNum();// = getNewFcbNum();
-	// 将fcb信息写入DISK
-	bitmap[fcbnumTmp] = true;
-	// disk[disknumTmp] = "fcb[" + fcbnumTmp +"]";
+	// 为fcb分配新的DISK空间 allocate a new disk space
+	var fcbnumTmp = getNewDiskNum();
 	// 将盘块号写入当前目录fcb的iaddr
 	disk[dirfcbNow].iaddr.push(fcbnumTmp);
-	// 将fcb写入fcb[]
+	// 将fcb写入磁盘
 	disk[fcbnumTmp] = fileTmp;
+	bitmap[fcbnumTmp] = true;
 	refreshDirCache(dirfcbNow);
 	return true;
 };
@@ -369,7 +315,7 @@ var vi = function (filename,text) {
 		return false;
 	}
 	var fcbnumTmp = find(filename);
-	var fcbTmp = disk[fcbnumTmp]; // = fcb[fcbnumTmp];
+	var fcbTmp = disk[fcbnumTmp];
 	if (fcbTmp.meta.type !== "-") {
 		console.log(filename + " is not a file, cannot be edited.");
 		return false;
@@ -425,12 +371,6 @@ var rm = function (filename) {
 			disk[fcbnumTmp] = undefined;
 			break;
 		}
-		// if (parseInt(disk[fcb[fcbTmp.pfcb].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
-		// 	bitmap[fcb[fcbTmp.pfcb].iaddr[i]] = false;
-		// 	disk[fcb[fcbTmp.pfcb].iaddr[i]] = undefined;
-		// 	fcb[fcbTmp.pfcb].iaddr.splice(i,1);
-		// 	break;
-		// }
 	};
 	// 释放文件控制块 free file fcb
 	refreshDirCache(dirfcbNow);
@@ -453,7 +393,7 @@ var mkdir = function (dirname) {
 		meta:{
 			type:"d",
 			own:"",
-			mod:[true,true,true,true,false,false,true,false,false],
+			mod:[true,true,true,true,true,false,true,true,false],
 			createAt:"",
 			updateAt:""
 		},
@@ -464,21 +404,18 @@ var mkdir = function (dirname) {
 	dirTmp.meta.own = userNow;
 	// 设置其父级文件夹FCB setting its parent directory fcn number
 	dirTmp.pfcb = dirfcbNow;
+	// 写入相应的时间变化 write the time change
 	var d = new Date();
 	dirTmp.meta.createAt = d.getTime();
 	dirTmp.meta.updateAt = d.getTime();
 	disk[dirTmp.pfcb].meta.updateAt = d.getTime();
-	// 分配新的DISK空间 allocate a new disk space
-	//var disknumTmp = getNewDiskNum();
 	// 分配新的FCB块 allocate a fcb
-	var fcbnumTmp = getNewDiskNum();// = getNewFcbNum();
-	// 将fcb信息写入DISK
-	bitmap[fcbnumTmp] = true;
-	//disk[disknumTmp] = "fcb[" + fcbnumTmp +"]";
+	var fcbnumTmp = getNewDiskNum();
 	// 将盘块号写入当前目录fcb的iaddr
 	disk[dirfcbNow].iaddr.push(fcbnumTmp);
-	// 将fcb写入fcb[]
+	// 将fcb写入磁盘
 	disk[fcbnumTmp] = dirTmp;
+	bitmap[fcbnumTmp] = true;
 	refreshDirCache(dirfcbNow);
 	return true;
 };
@@ -530,12 +467,6 @@ var rmdir = function (dirname) {
 			disk[fcbnumTmp] = undefined;
 			break;
 		}
-		// if (parseInt(disk[fcb[fcbTmp.pfcb].iaddr[i]].replace("fcb[","").replace("]","")) === fcbnumTmp) {
-		// 	bitmap[fcb[fcbTmp.pfcb].iaddr[i]] = false;
-		// 	disk[fcb[fcbTmp.pfcb].iaddr[i]] = undefined;
-		// 	fcb[fcbTmp.pfcb].iaddr.splice(i,1);
-		// 	break;
-		// }
 	};
 	// 释放文件控制块 free dir fcb
 	refreshDirCache(dirfcbNow);
@@ -609,11 +540,40 @@ var ll = function () {
 
 /* 初始化磁盘 INIT DISK */
 var init = function () {
-	bitmap[0] = true;
-	for (var i = 1; i < 1024; i++) {
+	bitmap = [true,true];
+	disk = [
+	{
+		name:null,
+		meta:{
+			type:"n",
+			own:null,
+			mod:[false,false,false,false,false,false,false,false,false],
+			createAt:0,
+			updateAt:0
+		},
+		pfcb:null,
+		iaddr:[]
+	},
+	{
+		name:"/",
+		meta:{
+			type:"d",
+			own:"root",
+			mod:[true,true,true,true,true,false,true,true,false],
+			createAt:1418995724279,
+			updateAt:1418995724279
+		},
+		pfcb:0,
+		iaddr:[]
+	}
+	];
+	for (var i = 2; i < 1024; i++) {
 		bitmap[i] = false;
 	}
-	refreshDirCache(1);
+	dirfcbNow = 1;
+	userNow = "root";
+	locNow = ["/"];
+	refreshDirCache(dirfcbNow);
 	mkdir("bin");
 	mkdir("etc");
 	mkdir("usr");
