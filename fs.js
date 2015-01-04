@@ -1,8 +1,6 @@
-/* TODOLIST
+/* 未完成功能 TO-DO LIST
  * (0) 完成绝对路径的改造，实现所有的东西只要写着filename的地方均可以使用绝对路径
- * (1) 完成索引函数，实现混合索引
- * (2) 为了更好地实现混合索引，所以要添加位是图数据结构
- * (3) 实现多种写入方式，现在只有追加，以后还要添加覆盖
+ * (1) 实现多种写入方式，现在只有追加，以后还要添加覆盖
  */
 
 // 全局变量，显示当前用户名 string name
@@ -47,7 +45,7 @@ var getNewDiskNum = function () {
 
 // 文本文档的读取
 var getValue = function (fcbnum) {
-	var addrArray = disk[fcbnum].iaddr;// = fcb[fcbnum].iaddr; // = getBlocks(fcbnum);
+	var addrArray = getAddressList(fcbnum);
 	var strTmp = "";
 	for (var i = 0; i < addrArray.length; i++) {
 		strTmp += disk[addrArray[i]];
@@ -62,66 +60,167 @@ var isDiskFull = function (disknum) {
 
 // 文本文档的写入
 var setValue = function (fcbnum,streamstr) {
+	// 先将字符串数组化以便于一个一个输入
 	var streamArray = streamstr.split("");
-	var fcbTmp = disk[fcbnum];
+	// 如果输入为空则直接取消执行，以防分配多余空盘块
+	if (streamArray.length === 0) {
+		return true;
+	}
 	var nowDisknum;
-	if (fcbTmp.iaddr.length === 0) {
+	// 先全部读出当前文件下的字符串
+	var realAddr = getAddressList(fcbnum);
+	// 当前文件下为空时的处理
+	if (realAddr.length === 0) {
+		// 分配一个新的盘块
 		nowDisknum = getNewDiskNum();
 		bitmap[nowDisknum] = true;
 		disk[nowDisknum] = "";
-		fcbTmp.iaddr.push(nowDisknum);
+		// 将其添加到数组中
+		realAddr.push(nowDisknum);
 	}
+	// 当前文件不为空时自动将“指针”指向数组末端
 	else {
-		nowDisknum = fcbTmp.iaddr[(fcbTmp.iaddr.length-1)];	
+		nowDisknum = realAddr[realAddr.length - 1];	
 	}
+	// 循环条件：当前等待写入的数组（缓冲）是否还有剩余
 	while (streamArray.length !== 0) {
+		// 当前指针所指盘块对应的内容是否已满，如果满了则分配新盘块
 		if (isDiskFull(nowDisknum) === true) {
 			nowDisknum = getNewDiskNum();
 			disk[nowDisknum] = "";
 			bitmap[nowDisknum] = true;
-			fcbTmp.iaddr.push(nowDisknum);
+			realAddr.push(nowDisknum);
 		}
+		// 写入数据
 		disk[nowDisknum] += streamArray.shift();
 	}
+	// 将新的地址表写入fcb中
+	setAddressList(realAddr,fcbnum);
 	return true;
 }
 
-// 未完成，预设中，索引设置
-var getIndex = function (disknum) {
-	return JSON.parse(disk[disknum]);
-}
-
-var getBlocks = function (fcbnum,indexnum) {
-	if (indexnum < 10) {
-		return fcb[fcbnum].iaddr[indexnum];
-	}
-	else if (indexnum < 20) {
-		var firstIndexDisknum = fcb[fcbnum].iaddr[10];
-		var firstIndex = getIndex(firstIndexDisknum);
-		return firstIndex[indexnum - 10];
-	}
-	else if (indexnum < 120) {
-		var secondIndexDisknum = fcb[fcnnum].iaddr[11];
-		var secondIndex = getIndex[secondIndexDisknum];
-		var firstIndexDisknum = secondIndex[parseInt((indexnum - 20) / 10)];
-		var firstIndex = getIndex(firstIndexDisknum);
-		return firstIndex[(indexnum - 20) % 10];
+// 索引设置
+// 将混合索引地址表转化为一维数组
+var getAddressList = function (fcbnum) {
+	var realAddr = [];
+	var addrTmp = disk[fcbnum].iaddr;
+	// 检测是否启用二级索引
+	if (addrTmp[11] === undefined) {
+		// 检测是否启用一级索引
+		if (addrTmp[10] === undefined) {
+			// 直接读出
+			for (var i = 0; i < addrTmp.length; i++) {
+				realAddr.push(addrTmp[i]);
+			};
+		}
+		else {
+			// 前十盘块号直接读出
+			for (var i = 0; i < 10; i++) {
+				realAddr.push(addrTmp[i]);
+			};
+			// 一级索引通过索引读出
+			var firstLevelIndex = disk[addrTmp[10]];
+			for (var i = 0; i < firstLevelIndex.length; i++) {
+				realAddr.push(firstLevelIndex[i]);
+			};
+		}
 	}
 	else {
+		// 前十盘块号直接读出
+		for (var i = 0; i < 10; i++) {
+			realAddr.push(addrTmp[i]);
+		};
+		// 一级索引通过索引读出
+		var firstLevelIndex = disk[addrTmp[10]];
+		for (var i = 0; i < 10; i++) {
+			realAddr.push(firstLevelIndex[i]);
+		};
+		// 通过二级索引读出一级索引
+		var secondLevelIndex = disk[addrTmp[11]];
+		for (var i = 0; i < secondLevelIndex.length; i++) {
+			// 一级索引通过索引读出
+			var firstLevelIndexTmp = disk[secondLevelIndex[i]];
+			for (var j = 0; j < firstLevelIndexTmp.length; j++) {
+				realAddr.push(firstLevelIndexTmp[j]);
+			};
+		};
+	}
+	return realAddr;
+}
+
+// 将一维顺序数组写入混合索引
+var setAddressList = function (realAddr,fcbnum) {
+	if (realAddr.length > 120) {
 		console.log("Out of Maxium File Bounder!");
 		return false;
 	}
-}
+	// 清除原有数据
+	if (disk[fcbnum].iaddr[11] !== undefined) {
+		var secondLevelIndex = disk[disk[fcbnum].iaddr[11]];
+		for (var i = 0; i < secondLevelIndex.length; i++) {
+			disk[secondLevelIndex[i]] = undefined;
+			bitmap[secondLevelIndex[i]] = false;
+		};
+		disk[disk[fcbnum].iaddr[11]] = undefined;
+		bitmap[disk[fcbnum].iaddr[11]] = false;
+	}
+	if (disk[fcbnum].iaddr[10] !== undefined) {
+		disk[disk[fcbnum].iaddr[10]] = undefined;
+		bitmap[disk[fcbnum].iaddr[10]] = false;
+	}
+	disk[fcbnum].iaddr = [];
+	// 按顺序逐次写入
+	if (realAddr.length <= 10) {
+		for (var i = 0; i < realAddr.length; i++) {
+			disk[fcbnum].iaddr.push(realAddr[i]);
+		};
+	}
+	else if (realAddr.length <= 20) {
+		for (var i = 0; i < 10; i++) {
+			disk[fcbnum].iaddr.push(realAddr[i]);
+		};
 
-var setIndex = function (value,disknum) {
-	var indexArray = JSON.parse(disk[disknum]);
-	indexArray.push(value);
-	disk[disknum] = JSON.stringify(indexArray);
-	return true;
-}
+		var firstLevelIndex;
+		for (var j = 10; j < realAddr.length; j++) {
+			firstLevelIndex.push(realAddr[j]);
+		};
+		var indexDiskNum = getNewDiskNum();
+		disk[indexDiskNum] = firstLevelIndex;
+		bitmap[indexDiskNum] = true;
+		disk[fcbnum].iaddr[10] = indexDiskNum;
+	}
+	else {
+		for (var i = 0; i < 10; i++) {
+			disk[fcbnum].iaddr.push(realAddr[i]);
+		};
 
-var setBlocks = function (value,fcbnum) {
+		var firstLevelIndex = [];
+		for (var j = 10; j < 20; j++) {
+			firstLevelIndex.push(realAddr[j]);
+		};
+		var firstLevelIndexDiskNum = getNewDiskNum();
+		disk[firstLevelIndexDiskNum] = firstLevelIndex;
+		bitmap[firstLevelIndexDiskNum] = true;
+		disk[fcbnum].iaddr[10] = firstLevelIndexDiskNum;
 
+		var secondLevelIndex = [];
+		var firstLevelIndexTmp = [];
+		for (var k = 20; k < realAddr.length; k++) {
+			firstLevelIndexTmp.push(realAddr[k]);
+			if (k % 10 === 9 || k === realAddr.length - 1) {
+				var firstLevelIndexTmpDiskNum = getNewDiskNum();
+				disk[firstLevelIndexTmpDiskNum] = firstLevelIndexTmp;
+				bitmap[firstLevelIndexTmpDiskNum] = true;
+				secondLevelIndex.push(firstLevelIndexTmpDiskNum);
+				firstLevelIndexTmp = [];
+			}
+		};
+
+		var secondLevelIndexDiskNum = getNewDiskNum();
+		disk[secondLevelIndexDiskNum] = secondLevelIndex;
+		bitmap[secondLevelIndexDiskNum] = true;
+		disk[fcbnum].iaddr[11] = secondLevelIndexDiskNum;
+	}
 }
 
 // 转换文件名到其对应i节点上的fcb号 Convert filename to fcbnum
@@ -579,6 +678,8 @@ var init = function () {
 	mkdir("usr");
 	mkdir("var");
 	mkdir("mnt");
+	touch("lorem");
+	vi("lorem","Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
 	touch("runfile");
 	vi("runfile","console.log(Date());");
 	mkdir(".hiddendir");
@@ -591,6 +692,7 @@ var init = function () {
 	touch("file2");
 	vi("file2","happy")
 	cd("..");
+	vi("lorem","\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
 	console.log("login as: " + whoami());
 	console.log("working directory: " + pwd());
 }
