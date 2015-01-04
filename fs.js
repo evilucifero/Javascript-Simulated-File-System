@@ -150,36 +150,48 @@ var getAddressList = function (fcbnum) {
 
 // 将一维顺序数组写入混合索引
 var setAddressList = function (realAddr,fcbnum) {
+	
+	// 如果超出大小则报错终止
 	if (realAddr.length > 120) {
 		console.log("Out of Maxium File Bounder!");
 		return false;
 	}
+
 	// 清除原有数据
 	if (disk[fcbnum].iaddr[11] !== undefined) {
+		// 如果二级索引存在则先清楚二级索引下的一级索引
 		var secondLevelIndex = disk[disk[fcbnum].iaddr[11]];
 		for (var i = 0; i < secondLevelIndex.length; i++) {
 			disk[secondLevelIndex[i]] = undefined;
 			bitmap[secondLevelIndex[i]] = false;
 		};
+		// 清除二级索引
 		disk[disk[fcbnum].iaddr[11]] = undefined;
 		bitmap[disk[fcbnum].iaddr[11]] = false;
 	}
 	if (disk[fcbnum].iaddr[10] !== undefined) {
+		// 如果一级索引存在则清除
 		disk[disk[fcbnum].iaddr[10]] = undefined;
 		bitmap[disk[fcbnum].iaddr[10]] = false;
 	}
+	// 清除iaddr
 	disk[fcbnum].iaddr = [];
-	// 按顺序逐次写入
+
+	// 接下来分类，按顺序逐次写入
+	// 当无需调用索引时，
 	if (realAddr.length <= 10) {
+		// 写入无需调用索引的部分
 		for (var i = 0; i < realAddr.length; i++) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
 	}
+	// 当仅需要一级索引时
 	else if (realAddr.length <= 20) {
+		// 写入无需调用索引的部分
 		for (var i = 0; i < 10; i++) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
-
+		// 生成一级索引
 		var firstLevelIndex;
 		for (var j = 10; j < realAddr.length; j++) {
 			firstLevelIndex.push(realAddr[j]);
@@ -187,13 +199,16 @@ var setAddressList = function (realAddr,fcbnum) {
 		var indexDiskNum = getNewDiskNum();
 		disk[indexDiskNum] = firstLevelIndex;
 		bitmap[indexDiskNum] = true;
+		// 写入一级索引
 		disk[fcbnum].iaddr[10] = indexDiskNum;
 	}
+	// 当需要二级索引时
 	else {
+		// 写入无需调用索引的部分
 		for (var i = 0; i < 10; i++) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
-
+		// 生成一级索引
 		var firstLevelIndex = [];
 		for (var j = 10; j < 20; j++) {
 			firstLevelIndex.push(realAddr[j]);
@@ -202,11 +217,12 @@ var setAddressList = function (realAddr,fcbnum) {
 		disk[firstLevelIndexDiskNum] = firstLevelIndex;
 		bitmap[firstLevelIndexDiskNum] = true;
 		disk[fcbnum].iaddr[10] = firstLevelIndexDiskNum;
-
+		// 生成二级索引
 		var secondLevelIndex = [];
 		var firstLevelIndexTmp = [];
 		for (var k = 20; k < realAddr.length; k++) {
 			firstLevelIndexTmp.push(realAddr[k]);
+			// 在二级索引下生成相应的一级索引
 			if (k % 10 === 9 || k === realAddr.length - 1) {
 				var firstLevelIndexTmpDiskNum = getNewDiskNum();
 				disk[firstLevelIndexTmpDiskNum] = firstLevelIndexTmp;
@@ -215,16 +231,17 @@ var setAddressList = function (realAddr,fcbnum) {
 				firstLevelIndexTmp = [];
 			}
 		};
-
 		var secondLevelIndexDiskNum = getNewDiskNum();
 		disk[secondLevelIndexDiskNum] = secondLevelIndex;
 		bitmap[secondLevelIndexDiskNum] = true;
+		// 写入二级索引
 		disk[fcbnum].iaddr[11] = secondLevelIndexDiskNum;
 	}
 }
 
 // 转换文件名到其对应i节点上的fcb号 Convert filename to fcbnum
 var find = function (filename) {
+	// 按名索取
 	for (var i = 0; i < dirFileNameCache.length; i++) {
 		if (dirFileNameCache[i] === filename) {
 			return dirFcbnumCache[i];	
@@ -234,17 +251,19 @@ var find = function (filename) {
 	return null;
 };
 
-// 刷新当前目录下的缓存
+// 刷新当前目录下的缓存 
 // refresh now dir Cache 
 // 当对目录/文件进行增删或打开新目录时
 // after opening a new folder delete/create a new file/dir
 var refreshDirCache = function (dirfcb) {
-	var count = 2;
+	// 设立..和.两个静态名占有[0]和[1]
 	dirFcbnumCache = [disk[dirfcb].pfcb,dirfcb];
 	dirFileNameCache = ["..","."];
+	// 从[2]开始将目录缓存写入其中
+	var count = 2;
 	for (var i = 0; i < disk[dirfcb].iaddr.length; i++) {
 		if (disk[dirfcb].iaddr[i] !== undefined) {
-			dirFcbnumCache[count] = disk[dirfcb].iaddr[i];// = parseInt(disk[fcb[dirfcb].iaddr[i]].replace("fcb[","").replace("]",""));
+			dirFcbnumCache[count] = disk[dirfcb].iaddr[i];
 			dirFileNameCache[count] = disk[dirFcbnumCache[count]].name;
 			count++;
 		}
@@ -318,9 +337,11 @@ var checkAct = function (act,filename) {
 		return false;
 	}
 	var i = 0;
+	// 如果当前用户不是文件主，则以其他用户对待，即从第7位开始看权限
 	if (userNow !== disk[fcbnumTmp].meta.own) {
 		i = 6;
 	}
+	// 根据rwx顺序决定检测权限位
 	if (act === "r") {
 	}
 	else if (act === "w") {
@@ -360,13 +381,16 @@ var shtime = function (unixtime) {
 /* 文件操作 FILE ACTION */
 // 创建新文件 create file
 var touch = function (filename) {
+	// 检查是否重名
 	if (checkDuplicateName(filename) === true) {
 		console.log("Already have a same name, please choose a new filename!");
 		return false;
 	}
+	// 检查权限，创建新文件视作写入权限
 	if (checkAct("w",".") === false) {
 		return false;
 	}
+	// fcb模型
 	var fileTmp = {
 		name:"",
 		meta:{
@@ -395,6 +419,7 @@ var touch = function (filename) {
 	// 将fcb写入磁盘
 	disk[fcbnumTmp] = fileTmp;
 	bitmap[fcbnumTmp] = true;
+	// 文件变化，刷新缓存
 	refreshDirCache(dirfcbNow);
 	return true;
 };
@@ -410,16 +435,25 @@ var cat = function (filename) {
 
 // 向文件内部写入文本 write file
 var vi = function (filename,text) {
+	// 权限检测
 	if (checkAct("w",filename) === false) {
 		return false;
 	}
+	// 检测文件是否存在
+	if (checkDuplicateName(filename) === false) {
+		console.log(filename + " is not existed.");
+		return false;
+	};
 	var fcbnumTmp = find(filename);
 	var fcbTmp = disk[fcbnumTmp];
+	// 文件类型检测
 	if (fcbTmp.meta.type !== "-") {
 		console.log(filename + " is not a file, cannot be edited.");
 		return false;
 	}
+	// 写入内容
 	setValue(fcbnumTmp,text);
+	// 写入相应的时间变化
 	var d = new Date();
 	fcbTmp.meta.updateAt = d.getTime();
 	disk[fcbTmp.pfcb].meta.updateAt = d.getTime();
@@ -428,19 +462,23 @@ var vi = function (filename,text) {
 
 // 执行文件 execute file
 var run = function (filename) {
+	// 权限检测
 	if (checkAct("x",filename) === false) {
 		return false;
 	}
+	// 检测文件是否存在
 	if (checkDuplicateName(filename) === false) {
 		console.log(filename + " is not existed.");
 		return false;
 	};
 	var fcbnumTmp = find(filename);
 	var fcbTmp = disk[fcbnumTmp];
+	// 检测文件类型
 	if (fcbTmp.meta.type !== "-") {
 		console.log(filename + " is not a file, cannot be run.");
 		return false;
 	}
+	// 执行文件内容
 	console.log(eval(getValue(fcbnumTmp)));
 	return true;
 };
@@ -480,13 +518,16 @@ var rm = function (filename) {
 
 // 创建新的文件夹 create directory
 var mkdir = function (dirname) {
+	// 重名检测
 	if (checkDuplicateName(dirname) === true) {
 		console.log("Already have a same name, please choose a new directory name!")
 		return false;
 	}
+	// 权限检测
 	if (checkAct("w",".") === false) {
 		return false;
 	}
+	// 目录模型
 	var dirTmp = {
 		name:"",
 		meta:{
@@ -515,6 +556,7 @@ var mkdir = function (dirname) {
 	// 将fcb写入磁盘
 	disk[fcbnumTmp] = dirTmp;
 	bitmap[fcbnumTmp] = true;
+	// 文件变化，刷新缓存
 	refreshDirCache(dirfcbNow);
 	return true;
 };
