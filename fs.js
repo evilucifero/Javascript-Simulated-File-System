@@ -60,6 +60,7 @@ var isDiskFull = function (disknum) {
 
 // 文本文档的写入
 var setValue = function (fcbnum,streamstr) {
+
 	// 先将字符串数组化以便于一个一个输入
 	var streamArray = streamstr.split("");
 	// 如果输入为空则直接取消执行，以防分配多余空盘块
@@ -67,8 +68,10 @@ var setValue = function (fcbnum,streamstr) {
 		return true;
 	}
 	var nowDisknum;
+
 	// 先全部读出当前文件下的字符串
 	var realAddr = getAddressList(fcbnum);
+
 	// 当前文件下为空时的处理
 	if (realAddr.length === 0) {
 		// 分配一个新的盘块
@@ -82,6 +85,7 @@ var setValue = function (fcbnum,streamstr) {
 	else {
 		nowDisknum = realAddr[realAddr.length - 1];	
 	}
+
 	// 循环条件：当前等待写入的数组（缓冲）是否还有剩余
 	while (streamArray.length !== 0) {
 		// 当前指针所指盘块对应的内容是否已满，如果满了则分配新盘块
@@ -94,6 +98,7 @@ var setValue = function (fcbnum,streamstr) {
 		// 写入数据
 		disk[nowDisknum] += streamArray.shift();
 	}
+
 	// 将新的地址表写入fcb中
 	setAddressList(realAddr,fcbnum);
 	return true;
@@ -104,20 +109,25 @@ var setValue = function (fcbnum,streamstr) {
 var getAddressList = function (fcbnum) {
 	var realAddr = [];
 	var addrTmp = disk[fcbnum].iaddr;
+
 	// 检测是否启用二级索引
 	if (addrTmp[11] === undefined) {
+
 		// 检测是否启用一级索引
 		if (addrTmp[10] === undefined) {
+
 			// 直接读出
 			for (var i = 0; i < addrTmp.length; i++) {
 				realAddr.push(addrTmp[i]);
 			};
 		}
 		else {
+
 			// 前十盘块号直接读出
 			for (var i = 0; i < 10; i++) {
 				realAddr.push(addrTmp[i]);
 			};
+
 			// 一级索引通过索引读出
 			var firstLevelIndex = disk[addrTmp[10]];
 			for (var i = 0; i < firstLevelIndex.length; i++) {
@@ -130,14 +140,17 @@ var getAddressList = function (fcbnum) {
 		for (var i = 0; i < 10; i++) {
 			realAddr.push(addrTmp[i]);
 		};
+
 		// 一级索引通过索引读出
 		var firstLevelIndex = disk[addrTmp[10]];
 		for (var i = 0; i < 10; i++) {
 			realAddr.push(firstLevelIndex[i]);
 		};
+
 		// 通过二级索引读出一级索引
 		var secondLevelIndex = disk[addrTmp[11]];
 		for (var i = 0; i < secondLevelIndex.length; i++) {
+
 			// 一级索引通过索引读出
 			var firstLevelIndexTmp = disk[secondLevelIndex[i]];
 			for (var j = 0; j < firstLevelIndexTmp.length; j++) {
@@ -159,17 +172,20 @@ var setAddressList = function (realAddr,fcbnum) {
 
 	// 清除原有数据
 	if (disk[fcbnum].iaddr[11] !== undefined) {
+
 		// 如果二级索引存在则先清楚二级索引下的一级索引
 		var secondLevelIndex = disk[disk[fcbnum].iaddr[11]];
 		for (var i = 0; i < secondLevelIndex.length; i++) {
 			disk[secondLevelIndex[i]] = undefined;
 			bitmap[secondLevelIndex[i]] = false;
 		};
+
 		// 清除二级索引
 		disk[disk[fcbnum].iaddr[11]] = undefined;
 		bitmap[disk[fcbnum].iaddr[11]] = false;
 	}
 	if (disk[fcbnum].iaddr[10] !== undefined) {
+
 		// 如果一级索引存在则清除
 		disk[disk[fcbnum].iaddr[10]] = undefined;
 		bitmap[disk[fcbnum].iaddr[10]] = false;
@@ -180,17 +196,21 @@ var setAddressList = function (realAddr,fcbnum) {
 	// 接下来分类，按顺序逐次写入
 	// 当无需调用索引时，
 	if (realAddr.length <= 10) {
+
 		// 写入无需调用索引的部分
 		for (var i = 0; i < realAddr.length; i++) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
 	}
+
 	// 当仅需要一级索引时
 	else if (realAddr.length <= 20) {
+
 		// 写入无需调用索引的部分
 		for (var i = 0; i < 10; i++) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
+
 		// 生成一级索引
 		var firstLevelIndex = [];
 		for (var j = 10; j < realAddr.length; j++) {
@@ -199,15 +219,19 @@ var setAddressList = function (realAddr,fcbnum) {
 		var indexDiskNum = getNewDiskNum();
 		disk[indexDiskNum] = firstLevelIndex;
 		bitmap[indexDiskNum] = true;
+
 		// 写入一级索引
 		disk[fcbnum].iaddr[10] = indexDiskNum;
 	}
+
 	// 当需要二级索引时
 	else {
+
 		// 写入无需调用索引的部分
 		for (var i = 0; i < 10; i++) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
+
 		// 生成一级索引
 		var firstLevelIndex = [];
 		for (var j = 10; j < 20; j++) {
@@ -217,11 +241,13 @@ var setAddressList = function (realAddr,fcbnum) {
 		disk[firstLevelIndexDiskNum] = firstLevelIndex;
 		bitmap[firstLevelIndexDiskNum] = true;
 		disk[fcbnum].iaddr[10] = firstLevelIndexDiskNum;
+
 		// 生成二级索引
 		var secondLevelIndex = [];
 		var firstLevelIndexTmp = [];
 		for (var k = 20; k < realAddr.length; k++) {
 			firstLevelIndexTmp.push(realAddr[k]);
+
 			// 在二级索引下生成相应的一级索引
 			if (k % 10 === 9 || k === realAddr.length - 1) {
 				var firstLevelIndexTmpDiskNum = getNewDiskNum();
@@ -234,6 +260,7 @@ var setAddressList = function (realAddr,fcbnum) {
 		var secondLevelIndexDiskNum = getNewDiskNum();
 		disk[secondLevelIndexDiskNum] = secondLevelIndex;
 		bitmap[secondLevelIndexDiskNum] = true;
+
 		// 写入二级索引
 		disk[fcbnum].iaddr[11] = secondLevelIndexDiskNum;
 	}
@@ -259,15 +286,9 @@ var refreshDirCache = function (dirfcb) {
 	// 设立..和.两个静态名占有[0]和[1]
 	dirFcbnumCache = [disk[dirfcb].pfcb,dirfcb];
 	dirFileNameCache = ["..","."];
-	// 从[2]开始将目录缓存写入其中
-	// var count = 2;
+	// 将其他项写入其中
 	var dirfcbAdrr = getAddressList(dirfcb);
 	for (var i = 0; i < dirfcbAdrr.length; i++) {
-		// if (dirfcbAdrr[i] !== undefined) {
-		// 	dirFcbnumCache[count] = dirfcbAdrr[i];
-		// 	dirFileNameCache[count] = disk[dirFcbnumCache[count]].name;
-		// 	count++;
-		// }
 		dirFcbnumCache.push(dirfcbAdrr[i]);
 		dirFileNameCache.push(disk[dirfcbAdrr[i]].name);
 	}
@@ -517,7 +538,6 @@ var rm = function (filename) {
 		}
 	};
 	setAddressList(realPfcbAddrTmp,fcbTmp.pfcb);
-	// 释放文件控制块 free file fcb
 	// 文件变化刷新缓存
 	refreshDirCache(dirfcbNow);
 	return true;
