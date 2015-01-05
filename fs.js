@@ -192,7 +192,7 @@ var setAddressList = function (realAddr,fcbnum) {
 			disk[fcbnum].iaddr.push(realAddr[i]);
 		};
 		// 生成一级索引
-		var firstLevelIndex;
+		var firstLevelIndex = [];
 		for (var j = 10; j < realAddr.length; j++) {
 			firstLevelIndex.push(realAddr[j]);
 		};
@@ -260,13 +260,16 @@ var refreshDirCache = function (dirfcb) {
 	dirFcbnumCache = [disk[dirfcb].pfcb,dirfcb];
 	dirFileNameCache = ["..","."];
 	// 从[2]开始将目录缓存写入其中
-	var count = 2;
-	for (var i = 0; i < disk[dirfcb].iaddr.length; i++) {
-		if (disk[dirfcb].iaddr[i] !== undefined) {
-			dirFcbnumCache[count] = disk[dirfcb].iaddr[i];
-			dirFileNameCache[count] = disk[dirFcbnumCache[count]].name;
-			count++;
-		}
+	// var count = 2;
+	var dirfcbAdrr = getAddressList(dirfcb);
+	for (var i = 0; i < dirfcbAdrr.length; i++) {
+		// if (dirfcbAdrr[i] !== undefined) {
+		// 	dirFcbnumCache[count] = dirfcbAdrr[i];
+		// 	dirFileNameCache[count] = disk[dirFcbnumCache[count]].name;
+		// 	count++;
+		// }
+		dirFcbnumCache.push(dirfcbAdrr[i]);
+		dirFileNameCache.push(disk[dirfcbAdrr[i]].name);
 	}
 };
 
@@ -415,7 +418,9 @@ var touch = function (filename) {
 	// 为fcb分配新的DISK空间 allocate a new disk space
 	var fcbnumTmp = getNewDiskNum();
 	// 将盘块号写入当前目录fcb的iaddr
-	disk[dirfcbNow].iaddr.push(fcbnumTmp);
+	var fcbAdrrTmp = getAddressList(dirfcbNow);
+	fcbAdrrTmp.push(fcbnumTmp);
+	setAddressList(fcbAdrrTmp,dirfcbNow);
 	// 将fcb写入磁盘
 	disk[fcbnumTmp] = fileTmp;
 	bitmap[fcbnumTmp] = true;
@@ -496,20 +501,24 @@ var rm = function (filename) {
 		return false;
 	};
 	// 从磁盘中删除该文件内容 delete its file content
-	for (var i = 0; i < fcbTmp.iaddr.length; i++) {
-		bitmap[fcbTmp.iaddr[i]] = false;
-		disk[fcbTmp.iaddr[i]] = undefined;
+	var realAddrTmp = getAddressList(fcbnumTmp);
+	for (var i = 0; i < realAddrTmp.length; i++) {
+		bitmap[realAddrTmp[i]] = false;
+		disk[realAddrTmp[i]] = undefined;
 	};
 	// 从目录中删除该文件节点 delete the file index under directory fcb
-	for (var i = 0; i < disk[fcbTmp.pfcb].iaddr.length; i++) {
-		if (disk[fcbTmp.pfcb].iaddr[i] === fcbnumTmp) {
-			disk[fcbTmp.pfcb].iaddr.splice(i,1);
+	var realPfcbAddrTmp = getAddressList(fcbTmp.pfcb);
+	for (var i = 0; i < realPfcbAddrTmp.length; i++) {
+		if (realPfcbAddrTmp[i] === fcbnumTmp) {
+			realPfcbAddrTmp.splice(i,1);
 			bitmap[fcbnumTmp] = false;
 			disk[fcbnumTmp] = undefined;
 			break;
 		}
 	};
+	setAddressList(realPfcbAddrTmp,fcbTmp.pfcb);
 	// 释放文件控制块 free file fcb
+	// 文件变化刷新缓存
 	refreshDirCache(dirfcbNow);
 	return true;
 };
@@ -552,7 +561,9 @@ var mkdir = function (dirname) {
 	// 分配新的FCB块 allocate a fcb
 	var fcbnumTmp = getNewDiskNum();
 	// 将盘块号写入当前目录fcb的iaddr
-	disk[dirfcbNow].iaddr.push(fcbnumTmp);
+	var dirAdrrTmp = getAddressList(dirfcbNow);
+	dirAdrrTmp.push(fcbnumTmp);
+	setAddressList(dirAdrrTmp,dirfcbNow);
 	// 将fcb写入磁盘
 	disk[fcbnumTmp] = dirTmp;
 	bitmap[fcbnumTmp] = true;
@@ -596,20 +607,24 @@ var rmdir = function (dirname) {
 		return false;
 	};
 	// 检查目录下是否还有其他文件
-	if (fcbTmp.iaddr.length !== 0) {
+	var realAddrTmp = getAddressList(fcbnumTmp);
+	if (realAddrTmp.length !== 0) {
 		console.log(dirname + " is not empty, try 'rmrf' instead.");
 		return false;
 	}
 	// 从目录中删除该目录节点 delete the dir index under directory fcb
-	for (var i = 0; i < disk[fcbTmp.pfcb].iaddr.length; i++) {
-		if (disk[fcbTmp.pfcb].iaddr[i] === fcbnumTmp) {
-			disk[fcbTmp.pfcb].iaddr.splice(i,1);
+	var realPfcbAddrTmp = getAddressList(fcbTmp.pfcb);
+	for (var i = 0; i < realPfcbAddrTmp.length; i++) {
+		if (realPfcbAddrTmp[i] === fcbnumTmp) {
+			realPfcbAddrTmp.splice(i,1);
 			bitmap[fcbnumTmp] = false;
 			disk[fcbnumTmp] = undefined;
 			break;
 		}
 	};
+	setAddressList(realPfcbAddrTmp,fcbTmp.pfcb);
 	// 释放文件控制块 free dir fcb
+	// 文件变化刷新缓存
 	refreshDirCache(dirfcbNow);
 	return true;
 };
@@ -626,7 +641,7 @@ var rmrf = function (elename) {
 	{
 		// 目录处理方式
 		// 检查目录下是否还有其他文件
-		if (fcbTmp.iaddr.length === 0) {
+		if (getAddressList(fcbnumTmp).length === 0) {
 			rmdir(elename);
 		}
 		else {
@@ -720,6 +735,13 @@ var init = function () {
 	mkdir("usr");
 	mkdir("var");
 	mkdir("mnt");
+	mkdir("proc");
+	mkdir("sbin");
+	touch("testfile1");
+	touch("testfile2");
+	touch("testfile3");
+	touch("testfile4");
+	touch("testfile5");
 	touch("lorem");
 	vi("lorem","Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
 	touch("runfile");
@@ -734,7 +756,7 @@ var init = function () {
 	touch("file2");
 	vi("file2","happy")
 	cd("..");
-	vi("lorem","\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+	//vi("lorem","\nLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
 	console.log("login as: " + whoami());
 	console.log("working directory: " + pwd());
 }
